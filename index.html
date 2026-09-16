@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stack Kitchen</title>
+</head>
+<body>
+<!-- ============ HOME ============ -->
+<div id="home" class="screen">
+  <div class="home-box">
+    <h1 class="logo">Stack Kitchen</h1>
+    <p class="tag">Draw, stack and claim ingredients — first to cook Appetizer + Main + Dessert ends the game.</p>
+    <label class="field">Your name <input id="nick" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Chef"></label>
+
+    <section class="mode">
+      <h2>Play vs Bots</h2>
+      <div class="seg" id="botCount">
+        <button data-n="2">2 players</button><button data-n="3">3 players</button><button data-n="4" class="on">4 players</button>
+      </div>
+      <button class="primary big" id="btnBots">Play</button>
+    </section>
+
+    <section class="mode">
+      <h2>Online room</h2>
+      <button class="primary big" id="btnCreate">Create room</button>
+      <div class="join-row">
+        <input id="roomCode" maxlength="5" autocomplete="off" spellcheck="false" placeholder="CODE">
+        <button class="big" id="btnJoin">Join</button>
+      </div>
+    </section>
+    <div class="home-msg" id="homeMsg"></div>
+  </div>
+</div>
+
+<!-- ============ LOBBY ============ -->
+<div id="lobby" class="screen" hidden>
+  <div class="home-box">
+    <h1 class="logo small">Room <span id="lobbyCode">·····</span></h1>
+    <div class="share">
+      <input id="shareLink" readonly>
+      <button id="btnCopy">Copy link</button>
+    </div>
+    <div class="seg" id="seatCount" hidden>
+      <button data-n="2">2 seats</button><button data-n="3">3 seats</button><button data-n="4" class="on">4 seats</button>
+    </div>
+    <ul class="seat-list" id="seatList"></ul>
+    <div class="home-msg" id="lobbyMsg"></div>
+    <div class="row">
+      <button id="btnLeaveLobby">Leave</button>
+      <button class="primary big" id="btnStart" hidden>Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TABLE ============ -->
+<div id="app" hidden>
+  <div id="hud">
+    <span class="title">Stack Kitchen</span>
+    <span class="chip">Turn <b id="cTurn">0</b></span>
+    <span class="chip" id="cRoom" hidden></span>
+    <span class="chip timer" id="cTimer" hidden></span>
+    <span class="gap24"></span>
+    <button id="btnRestart">Restart</button>
+    <span class="spacer"></span>
+    <button id="btnRecipes">Recipes</button>
+    <button id="btnLog">Log ▸</button>
+    <button id="btnHome">Home</button>
+  </div>
+
+  <div id="table-surface">
+    <div id="alu-table"></div>
+    <svg id="props" viewBox="0 0 120 64" width="150" height="80" fill="none" stroke="#cfd3d6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="34" cy="46" rx="20" ry="10" fill="#d9dcdf"/><path d="M14 42 Q34 20 54 42" fill="#eceff1"/>
+      <path d="M50 32 Q66 30 64 42 Q62 50 50 46"/><path d="M18 30 Q10 30 10 38 Q10 46 18 44"/>
+      <rect x="30" y="14" width="10" height="6" rx="2" fill="#eceff1"/>
+      <path d="M84 30 L90 54 L106 54 L112 30 Z" fill="rgba(120,80,40,.55)"/>
+      <circle cx="93" cy="36" r="3" fill="#e8f4ff"/><circle cx="101" cy="40" r="3" fill="#e8f4ff"/>
+    </svg>
+    <div id="seats"></div>
+    <div id="center-play">
+      <div class="slot" id="pool-pile"></div>
+      <div class="slot" id="last-slot"></div>
+      <div class="slot" id="discard-slot"></div>
+    </div>
+    <div id="prep"></div>
+    <div id="dock">
+      <div id="my-panel">
+        <div class="head1 prow" id="my-h1"></div>
+        <div class="head2 prow" id="my-h2"></div>
+        <div class="head2 prow" id="my-h3"></div>
+        <div id="my-foods"></div>
+      </div>
+      <div class="hand-fan" id="hand-fan"><div class="fan-ui" id="fan-ui"></div></div>
+    </div>
+  </div>
+
+  <div id="fx"></div>
+  <div id="drag-layer"></div>
+  <div id="log-drawer"><div class="top"><span>Action log</span><button id="btnLogClose">✕</button></div><div id="log"></div></div>
+</div>
+
+<div id="toast"></div>
+<div class="modal" id="recipeModal"><div class="box" id="recipeBox"></div></div>
+<div class="modal" id="endModal"><div class="box" id="endBox"></div></div>
+<div class="modal" id="noticeModal"><div class="box" id="noticeBox"></div></div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

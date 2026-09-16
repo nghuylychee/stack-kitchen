@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>007 Stack Kitchen</title>
+<style>
+  :root {
+    --bg-page:#0d0b09; --sidewalk:#2b2620; --sidewalk-line:#3a352c;
+    --table-top-1:#c7cacd; --table-top-2:#8d9094; --table-rim:#6e7276; --table-shadow:rgba(0,0,0,.45);
+    --stool-red:#c9433c; --stool-blue:#2f6fb0;
+    --panel:#201b16; --panel-2:#2a241d; --panel-border:#3a332a; --text:#f0e6d8; --text-dim:#a89a86;
+    --course-a:#4caf6b; --course-m:#c9552c; --course-d:#b0559e;
+    --gold:#f2c14e; --invalid:#ff5252; --new-ring:#6fd1ff;
+    --ember-1:#ff8a3d; --ember-2:#ffcf6b;
+    --ing-bg:#f4efe2; --ing-border:#8a6f42; --back-1:#6b4530; --back-2:#4a2f1f;
+    --dark:#231a0c;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; color:var(--text);
+    background: radial-gradient(circle at 50% -10%, rgba(255,214,140,.14), transparent 60%), var(--bg-page);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size:14px; }
+  #app { position:fixed; inset:0; touch-action:none; user-select:none; -webkit-user-select:none; }
+  button, select { font:inherit; min-height:44px; min-width:44px; padding:0 12px; border-radius:8px;
+    border:1px solid var(--panel-border); background:var(--panel-2); color:var(--text); cursor:pointer; touch-action:manipulation; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.primary { background:var(--gold); color:var(--dark); font-weight:800; border-color:#b8902f; }
+  button.pass { background:rgba(32,27,22,.85); border:1.5px solid var(--invalid); }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; top:0; left:0; right:0; height:56px; display:flex; align-items:center; gap:8px; padding:0 10px;
+    background:var(--panel); border-bottom:1px solid var(--panel-border); z-index:50; white-space:nowrap; overflow:hidden; }
+  #hud .title { font-weight:800; letter-spacing:.3px; margin-right:4px; }
+  #hud .gap24 { margin-left:24px; }
+  .chip { background:rgba(0,0,0,.25); border-radius:6px; padding:4px 8px; color:var(--text-dim); font-size:13px; }
+  .chip b { color:var(--text); }
+  #hud .spacer { flex:1; }
+
+  /* ---------- Table ---------- */
+  #table-surface { position:fixed; top:56px; left:0; right:0; bottom:0; overflow:hidden; background-color:var(--sidewalk);
+    background-image: linear-gradient(0deg, var(--sidewalk-line) 1px, transparent 1px), linear-gradient(90deg, var(--sidewalk-line) 1px, transparent 1px);
+    background-size:28px 28px; }
+  #alu-table { position:absolute; left:50%; top:calc(40% - 105px); bottom:118px; width:58%; transform:translateX(-50%); border-radius:18px;
+    background: repeating-linear-gradient(100deg, rgba(255,255,255,.07) 0 1px, transparent 1px 5px), linear-gradient(135deg, var(--table-top-1), var(--table-top-2));
+    border:2px solid var(--table-rim); box-shadow:0 10px 24px var(--table-shadow); opacity:.92; }
+  #props { position:absolute; left:calc(79% - 150px); top:calc(70% - 76px); opacity:.85; pointer-events:none; }
+
+  /* ---------- Cards ---------- */
+  .card { position:relative; width:var(--w); height:var(--h); border-radius:max(6px, calc(var(--w) * .1)); background:var(--ing-bg);
+    border:2px solid var(--ing-border); overflow:hidden; box-shadow:0 3px 6px rgba(0,0,0,.35); flex:none; }
+  .card .hdr { position:absolute; left:0; right:0; top:0; height:20%; background:rgba(20,16,10,.55); color:var(--text); font-weight:700;
+    font-size:var(--fs); display:flex; align-items:center; justify-content:center; padding:0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; z-index:1; }
+  .card .hdr span { overflow:hidden; text-overflow:ellipsis; }
+  .card .ph { position:absolute; left:4px; right:4px; top:calc(20% + 3px); bottom:4px; border-radius:4px; overflow:hidden; background:#d8cfbc; }
+  .card .ph img { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+  .card.food { border:3px solid var(--cc); }
+  .card .cchip { position:absolute; left:3px; top:3px; width:max(14px, calc(var(--w) * .28)); height:max(14px, calc(var(--w) * .28)); border-radius:50%;
+    background:var(--cc); border:1.5px solid rgba(0,0,0,.4); color:var(--text); font-weight:800; font-size:calc(var(--fs) + 1px);
+    display:flex; align-items:center; justify-content:center; z-index:2; }
+  .card.food .hdr { padding-left:calc(var(--w) * .3); }
+  .card .pchip { position:absolute; right:4px; bottom:4px; background:var(--gold); color:var(--dark); border:1px solid rgba(0,0,0,.45);
+    border-radius:999px; padding:0 5px; font-weight:800; font-size:calc(var(--fs) + 1px); z-index:2; }
+  .card.back { background: repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(240,230,216,.08) 6px, rgba(240,230,216,.08) 10px),
+    linear-gradient(135deg, var(--back-1), var(--back-2)); display:flex; align-items:center; justify-content:center; }
+  .card.back svg { width:40%; opacity:.35; }
+  .cc-A { --cc:var(--course-a); } .cc-M { --cc:var(--course-m); } .cc-D { --cc:var(--course-d); }
+  .s-hand   { --w:96px; --h:134px; --fs:11px; }
+  .s-center { --w:92px; --h:128px; --fs:11px; }
+  .s-disc   { --w:60px; --h:84px;  --fs:8px; }
+  .s-bstk   { --w:48px; --h:67px;  --fs:7px; }
+  .s-mini   { --w:40px; --h:56px;  --fs:6px; }
+  .s-mini .ph, .s-bstk .ph { left:2px; right:2px; bottom:2px; }
+  .card.shine::after { content:''; position:absolute; inset:0; z-index:3; pointer-events:none;
+    background:linear-gradient(115deg, transparent 40%, rgba(255,255,255,.35) 50%, transparent 60%); background-size:300% 100%;
+    animation:shine .4s ease-out forwards; }
+  @keyframes shine { from { background-position:100% 0; } to { background-position:-50% 0; } }
+  .card.useful { box-shadow:0 3px 6px rgba(0,0,0,.35), 0 0 0 3px var(--gold); animation:goldpulse 1.1s ease-in-out infinite; }
+  @keyframes goldpulse { 0%,100% { box-shadow:0 3px 6px rgba(0,0,0,.35), 0 0 0 3px rgba(242,193,78,.5); } 50% { box-shadow:0 3px 6px rgba(0,0,0,.35), 0 0 0 3px rgba(242,193,78,1); } }
+  .card.claimable { animation:claimpulse .7s ease-in-out infinite; }
+  @keyframes claimpulse { 0%,100% { box-shadow:0 0 0 3px rgba(242,193,78,.55), 0 0 8px rgba(242,193,78,.3); } 50% { box-shadow:0 0 0 6px rgba(242,193,78,1), 0 0 22px rgba(242,193,78,.7); } }
+  .card.new { outline:3px solid var(--new-ring); outline-offset:1px; }
+  .card.sel { outline:3px solid var(--text); outline-offset:1px; }
+  .card.locked { filter:brightness(.82) saturate(.85); }
+  .card.invalid { animation:shake .3s linear; border-color:var(--invalid) !important; }
+  @keyframes shake { 0%,100% { translate:0 0; } 20% { translate:-6px 0; } 40% { translate:6px 0; } 60% { translate:-4px 0; } 80% { translate:4px 0; } }
+  .card.settle { animation:settle .1s ease-out; }
+  @keyframes settle { 50% { scale:1.06; } }
+  .card.pop-in { animation:popin .35s ease-out; }
+  @keyframes popin { 0% { scale:.6; } 60% { scale:1.1; } 100% { scale:1; } }
+  .incoming { visibility:hidden !important; }
+
+  /* small food card (collected foods) — scaled-down food card face */
+  .fcard { position:relative; flex:none; border-radius:6px; border:3px solid var(--cc); overflow:hidden; background:#000; display:inline-block; }
+  .fcard img { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+  .fcard .l { position:absolute; left:1px; top:1px; background:var(--cc); color:var(--text); font-weight:800; border-radius:50%; border:1px solid rgba(0,0,0,.4);
+    font-size:9px; width:14px; height:14px; display:flex; align-items:center; justify-content:center; }
+  .fcard .p { position:absolute; right:1px; top:1px; background:var(--gold); color:var(--dark); font-weight:800; border-radius:999px; font-size:9px; padding:0 3px; border:1px solid rgba(0,0,0,.45); }
+  .fcard .n { position:absolute; left:0; right:0; bottom:0; background:rgba(20,16,10,.72); color:var(--text); font-size:8px; font-weight:700; text-align:center;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:1px 2px; }
+  .fcard.xs { width:44px; height:44px; } .fcard.xs .n { display:none; } .fcard.xs .p { top:auto; bottom:1px; }
+  .fcard.sm { width:64px; height:64px; } .fcard.sm .l { width:17px; height:17px; font-size:11px; } .fcard.sm .p { font-size:11px; padding:0 4px; }
+  .fcard.th { width:32px; height:32px; border-width:2px; vertical-align:middle; } .fcard.th .n, .fcard.th .l, .fcard.th .p { display:none; }
+
+  /* ---------- Seats (bots) ---------- */
+  .seat { position:absolute; width:clamp(220px,20vw,260px); height:clamp(170px,18vh,190px); transform:translate(-50%,-50%);
+    background:var(--panel); border:2px solid var(--panel-border); border-radius:10px; padding:6px 8px; display:flex; flex-direction:column; gap:4px; z-index:5; }
+  .seat[data-seat=top] { left:50%; top:14%; } .seat.two[data-seat=top] { top:14%; width:clamp(240px,22vw,280px); }
+  .seat[data-seat=left] { left:12%; top:50%; } .seat[data-seat=right] { left:88%; top:50%; }
+  .seat[data-seat=top-left] { left:30%; top:15%; } .seat[data-seat=top-right] { left:70%; top:15%; }
+  .seat.active, #dock.active #my-panel { border-color:var(--gold); animation:turnlight 1.6s ease-in-out infinite; }
+  @keyframes turnlight { 0%,100% { box-shadow:0 0 0 3px rgba(242,193,78,.21); } 50% { box-shadow:0 0 0 3px rgba(242,193,78,.35), 0 0 18px rgba(242,193,78,.3); } }
+  .head1, .head2 { display:flex; align-items:center; gap:6px; min-width:0; }
+  .stool { width:16px; height:12px; border-radius:4px 4px 1px 1px; flex:none; }
+  .stool.r { background:var(--stool-red); } .stool.b { background:var(--stool-blue); }
+  .plate { background:var(--ing-bg); color:var(--dark); border-radius:4px; padding:1px 6px; font-weight:800; font-size:13px; }
+  .score { color:var(--gold); font-weight:800; font-size:15px; display:inline-block; margin-left:auto; text-shadow:0 1px 0 var(--dark); white-space:nowrap; }
+  .score.punch { animation:punch .2s ease-out; }
+  @keyframes punch { 50% { scale:1.25; } }
+  .stat { color:var(--text-dim); font-size:12px; display:flex; align-items:center; gap:3px; }
+  .stat b { color:var(--text); }
+  .backicon { display:inline-block; width:9px; height:12px; border-radius:2px; background:linear-gradient(135deg,var(--back-1),var(--back-2)); border:1px solid var(--ing-border); }
+  .courses { display:flex; gap:3px; margin-left:auto; }
+  .course { font-size:10px; padding:1px 5px; border-radius:4px; background:#2c261f; color:#6d6356; font-weight:800; }
+  .course.A.have { background:var(--course-a); color:var(--text); } .course.M.have { background:var(--course-m); color:var(--text); } .course.D.have { background:var(--course-d); color:var(--text); }
+  .seat-hand-backs { position:relative; height:58px; flex:none; }
+  .seat-hand-backs .card { position:absolute; top:1px; }
+  .seat-foods { display:flex; gap:4px; overflow-x:auto; overflow-y:hidden; flex:none; height:48px; align-items:center; scrollbar-width:thin;
+    -webkit-mask-image:linear-gradient(90deg,#000 88%,transparent); mask-image:linear-gradient(90deg,#000 88%,transparent); padding-right:14px; }
+
+  /* bot mini stack: floats beside the pod, toward the table, no tray */
+  .seat-stack { position:absolute; top:6px; width:48px; }
+  .seat-stack.empty { display:none; }
+  .seat[data-seat=top] .seat-stack, .seat[data-seat=top-left] .seat-stack, .seat[data-seat=top-right] .seat-stack, .seat[data-seat=left] .seat-stack { left:calc(100% + 10px); }
+  .seat[data-seat=right] .seat-stack { right:calc(100% + 10px); }
+  .stack { position:relative; filter:drop-shadow(0 4px 8px rgba(0,0,0,.4)); }
+  .stack > .card { position:absolute; left:0; }
+  .prog { position:absolute; left:3px; right:3px; top:-10px; height:6px; border-radius:3px; background:rgba(0,0,0,.35); overflow:hidden; z-index:5; }
+  .prog i { display:block; height:100%; width:100%; background:linear-gradient(90deg,var(--ember-1),var(--ember-2)); transform-origin:0 50%;
+    animation:cookfill linear forwards; }
+  @keyframes cookfill { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+  .steam { position:absolute; left:0; right:0; top:-12px; height:0; pointer-events:none; z-index:6; }
+  .steam span { position:absolute; bottom:0; width:16px; height:16px; border-radius:50%; background:radial-gradient(circle, rgba(240,230,216,.55), transparent 70%);
+    animation:steam 1.1s ease-out infinite; opacity:0; }
+  .steam span:nth-child(1) { left:18%; } .steam span:nth-child(2) { left:44%; animation-delay:.35s; } .steam span:nth-child(3) { left:68%; animation-delay:.7s; }
+  @keyframes steam { 0% { transform:translateY(0) scale(.8); opacity:.9; } 100% { transform:translateY(-26px) scale(1.4); opacity:0; } }
+
+  /* ---------- Center ---------- */
+  #center-play { position:absolute; left:50%; top:40%; transform:translate(-50%,-50%); width:clamp(320px,32vw,380px); height:clamp(140px,18vh,170px);
+    display:grid; grid-template-columns:1fr 1fr 1fr; align-items:center; justify-items:center; z-index:4; }
+  .slot { position:relative; width:92px; height:128px; border-radius:9px; }
+  .slot.dashed { border:2px dashed rgba(35,26,12,.35); }
+  .slot .lbl { position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:3px; font-size:11px; color:var(--dark); font-weight:700; white-space:nowrap; text-shadow:0 1px 0 rgba(255,255,255,.35); }
+  #pool-pile .card { position:absolute; left:0; top:0; }
+  #pool-pile.glow .card:last-of-type { animation:claimpulse 1.1s ease-in-out infinite; cursor:pointer; }
+  #last-slot .card { position:absolute; left:0; top:0; }
+  #last-slot .card.just { animation:popin .4s ease-out; }
+  #discard-slot .card { position:absolute; }
+  #btnPass { position:absolute; top:calc(100% - 14px); left:50%; transform:translateX(-50%); z-index:8; }
+
+  /* ---------- Dock (human) ---------- */
+  /* table stacks (sửa (3)): free area of the table between center pile and the dock, no label */
+  #prep { position:absolute; left:50%; transform:translateX(-50%); width:250px; top:calc(40% + clamp(70px,9vh,85px) + 26px); bottom:150px;
+    z-index:5; pointer-events:none; border-radius:14px; }
+  /* sửa (5): one small cook zone, centred; outlined only while dragging an ingredient */
+  #prep.show { outline:3px dashed rgba(184,132,30,.75); outline-offset:0; background:rgba(242,193,78,.10); }
+  #prep.hot { outline:3px solid rgba(214,158,40,1); outline-offset:0; background:rgba(242,193,78,.24); }
+  /* sửa (5): play zone = #last-slot, highlighted for the whole play phase (no tap-select + Play button) */
+  #last-slot.play-target { border:3px dashed #c8922a; background:rgba(242,193,78,.08); animation:playpulse 1.3s ease-in-out infinite; }
+  #last-slot.play-target .lbl { color:#7a5a12; opacity:1 !important; }
+  #last-slot.play-hot { border-style:solid; background:rgba(242,193,78,.28); animation:none; box-shadow:0 0 0 4px rgba(242,193,78,.5), 0 0 22px rgba(242,193,78,.55); }
+  #last-slot.play-flash { animation:playflash .45s ease-out; }
+  @keyframes playpulse { 0%,100% { box-shadow:0 0 0 0 rgba(242,193,78,.0); } 50% { box-shadow:0 0 0 5px rgba(242,193,78,.35); } }
+  @keyframes playflash { 0% { box-shadow:0 0 0 0 rgba(242,193,78,.9); } 100% { box-shadow:0 0 0 18px rgba(242,193,78,0); } }
+  .s-prep { --w:76px; --h:106px; --fs:10px; }
+  #prep .hgroup { width:76px; }
+  #prep .cookbtn { position:absolute; pointer-events:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 4px 12px rgba(0,0,0,.5); animation:popin .25s ease-out; padding:0 10px; z-index:90; }
+  #prep .prep-tip { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:var(--dark); font-size:12px; font-weight:700; background:rgba(240,230,216,.75);
+    border-radius:999px; padding:4px 12px; white-space:nowrap; }
+  #dock { position:absolute; left:0; right:0; bottom:0; height:clamp(210px,30vh,240px); display:flex; gap:10px; padding:8px 12px; z-index:6; pointer-events:none;
+    background:linear-gradient(to top, rgba(0,0,0,.45), rgba(0,0,0,.1) 70%, transparent); }
+  #my-panel { pointer-events:auto; width:clamp(190px,18vw,220px); flex:none; background:var(--panel); border:2px solid var(--panel-border); border-radius:10px; padding:7px 8px;
+    display:flex; flex-direction:column; gap:4px; min-height:0; }
+  #my-panel .prow { padding-bottom:4px; border-bottom:1px solid rgba(58,51,42,.4); }
+  #my-panel .score { font-size:20px; }
+  #my-panel .courses { margin-left:0; }
+  #my-foods { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; display:flex; flex-wrap:wrap; gap:4px; align-content:flex-start; scrollbar-width:thin; }
+  #my-panel.hot { border-color:var(--gold) !important; animation:panelhot .7s ease-in-out infinite !important; }
+  @keyframes panelhot { 0%,100% { box-shadow:0 0 0 4px rgba(242,193,78,.12); } 50% { box-shadow:0 0 0 4px rgba(242,193,78,.4), 0 0 16px rgba(242,193,78,.35); } }
+  .hand-fan { position:relative; flex:1; min-width:0; overflow:visible; }
+  .hgroup { position:absolute; left:0; top:0; width:96px; pointer-events:none; transform-origin:50% 100%;
+    transform:translate(var(--x), var(--y)) rotate(var(--r)); transition:transform .18s ease-out; }
+  .hgroup .wob { position:relative; width:100%; height:100%; animation:wobble 2.6s ease-in-out infinite; border-radius:10px; }
+  .hgroup .card { position:absolute; left:0; pointer-events:auto; cursor:grab; transition:translate .12s ease-out, scale .12s ease-out; }
+  .hgroup.stack .card:not(.top) { box-shadow:0 3px 4px rgba(0,0,0,.35); }
+  .hgroup.stack .wob { filter:drop-shadow(0 6px 12px rgba(0,0,0,.4)); }
+  .hgroup.locked .card { pointer-events:none; }
+  .hgroup .card.sel { translate:0 -28px; }
+  @media (hover:hover) {
+    .hand-fan.live .hgroup:not(.locked) .card.top:hover { translate:0 -20px; scale:1.08; }
+    .hand-fan.live .hgroup:has(.card.top:hover) { z-index:60 !important; }
+  }
+  .hgroup.drop-ok .wob { outline:3px solid var(--gold); outline-offset:3px; animation:dropok .7s ease-in-out infinite; }
+  @keyframes dropok { 0%,100% { outline-color:rgba(242,193,78,.5); } 50% { outline-color:rgba(242,193,78,1); } }
+  .hgroup.drop-bad .wob { outline:2px solid var(--invalid); outline-offset:3px; animation:none; }
+  .hgroup.bad-flash .wob { outline:2px solid var(--invalid); outline-offset:3px; animation:shake .2s linear; }
+  @keyframes wobble { 0%,100% { translate:0 -2px; } 50% { translate:0 2px; } }
+  .fan-ui { position:absolute; inset:0; pointer-events:none; z-index:80; }
+  .fan-ui button { pointer-events:auto; position:absolute; white-space:nowrap; box-shadow:0 4px 12px rgba(0,0,0,.5); }
+  .fan-ui .cookbtn { overflow:hidden; text-overflow:ellipsis; animation:popin .25s ease-out; padding:0 10px; }
+  .fan-msg { position:absolute; left:50%; top:40%; transform:translate(-50%,-50%); color:var(--text-dim); font-size:13px; }
+  .fan-tip { position:absolute; left:50%; top:-8px; transform:translate(-50%,-100%); color:var(--text); font-size:12px; background:rgba(32,27,22,.8);
+    border-radius:999px; padding:4px 12px; opacity:.85; }
+
+  /* ---------- FX / overlays ---------- */
+  #fx, #drag-layer { position:fixed; inset:0; pointer-events:none; }
+  #fx { z-index:30; } #drag-layer { z-index:35; }
+  #drag-layer .card { position:fixed; margin:0; box-shadow:0 14px 26px rgba(0,0,0,.55); }
+  .pop { position:fixed; z-index:40; pointer-events:none; font-weight:900; font-size:24px; color:var(--gold); text-shadow:0 2px 0 var(--dark), 0 0 3px var(--dark); white-space:nowrap; }
+  .pop small { font-size:13px; margin-left:3px; }
+  .smoke { position:fixed; z-index:40; pointer-events:none; width:18px; height:18px; border-radius:50%; background:radial-gradient(circle, rgba(240,230,216,.5), transparent 70%); }
+  #toast { position:fixed; top:66px; left:50%; transform:translate(-50%,-12px); z-index:40; background:var(--panel); border-left:3px solid var(--gold);
+    color:var(--text); padding:10px 16px; border-radius:999px; opacity:0; transition:opacity .3s, transform .3s; pointer-events:none; box-shadow:0 6px 16px rgba(0,0,0,.5); font-weight:600; }
+  #toast.show { opacity:1; transform:translate(-50%,0); }
+  #log-drawer { position:fixed; top:56px; right:0; bottom:0; width:320px; background:var(--panel); border-left:1px solid var(--panel-border); z-index:45;
+    transform:translateX(100%); transition:transform .22s ease-out; display:flex; flex-direction:column; }
+  #log-drawer.open { transform:none; }
+  #log-drawer .top { display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-bottom:1px solid var(--panel-border); font-weight:700; }
+  #log { overflow:auto; padding:8px; font-size:12px; line-height:1.45; flex:1; user-select:text; }
+  #log div { border-bottom:1px solid #2c261f; padding:2px 0; }
+  #log .why { color:var(--text-dim); } #log .claim { color:var(--gold); } #log .reveal { color:var(--text); font-weight:600; } #log .end { color:#ff8a8a; font-weight:700; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; z-index:60; padding:16px; }
+  .modal.show { display:flex; }
+  .box { background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:16px; max-width:760px; width:100%; max-height:90vh; overflow:auto; }
+  .box h2 { margin:0 0 10px; font-size:18px; }
+  .box .row { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 0; align-items:center; }
+  table.recipes { border-collapse:collapse; width:100%; font-size:12px; }
+  table.recipes td, table.recipes th { border-bottom:1px solid var(--panel-border); padding:4px; text-align:left; vertical-align:middle; }
+  table.recipes tr.can td { color:var(--gold); font-weight:700; }
+  table.recipes tr.win td { background:rgba(242,193,78,.08); } table.recipes tr.win td:first-child { box-shadow:inset 3px 0 0 var(--gold); }
+  .sw { display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--cc); margin-right:4px; vertical-align:middle; }
+  .fitem { display:inline-flex; align-items:center; gap:4px; margin:2px 8px 2px 0; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <span class="title">Stack Kitchen</span>
+    <label class="chip">Players <select id="numPlayers"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></label>
+    <span class="chip">Turn <b id="cTurn">0</b></span>
+    <span class="gap24"></span>
+    <button id="btnRestart">Restart</button>
+    <span class="spacer"></span>
+    <button id="btnRecipes">Recipes</button>
+    <button id="btnLog">Log ▸</button>
+  </div>
+
+  <div id="table-surface">
+    <div id="alu-table"></div>
+    <svg id="props" viewBox="0 0 120 64" width="150" height="80" fill="none" stroke="#cfd3d6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="34" cy="46" rx="20" ry="10" fill="#d9dcdf"/><path d="M14 42 Q34 20 54 42" fill="#eceff1"/>
+      <path d="M50 32 Q66 30 64 42 Q62 50 50 46"/><path d="M18 30 Q10 30 10 38 Q10 46 18 44"/>
+      <rect x="30" y="14" width="10" height="6" rx="2" fill="#eceff1"/>
+      <path d="M84 30 L90 54 L106 54 L112 30 Z" fill="rgba(120,80,40,.55)"/>
+      <circle cx="93" cy="36" r="3" fill="#e8f4ff"/><circle cx="101" cy="40" r="3" fill="#e8f4ff"/>
+    </svg>
+    <div id="seats"></div>
+    <div id="center-play">
+      <div class="slot" id="pool-pile"></div>
+      <div class="slot" id="last-slot"></div>
+      <div class="slot" id="discard-slot"></div>
+    </div>
+    <div id="prep"></div>
+    <div id="dock">
+      <div id="my-panel">
+        <div class="head1 prow" id="my-h1"></div>
+        <div class="head2 prow" id="my-h2"></div>
+        <div class="head2 prow" id="my-h3"></div>
+        <div id="my-foods"></div>
+      </div>
+      <div class="hand-fan" id="hand-fan"><div class="fan-ui" id="fan-ui"></div></div>
+    </div>
+  </div>
+
+  <div id="fx"></div>
+  <div id="drag-layer"></div>
+  <div id="toast"></div>
+  <div id="log-drawer"><div class="top"><span>Action log</span><button id="btnLogClose">✕</button></div><div id="log"></div></div>
+</div>
+
+<div class="modal" id="recipeModal"><div class="box" id="recipeBox"></div></div>
+<div class="modal" id="endModal"><div class="box" id="endBox"></div></div>
+
+<script>
+(() => {
+  // =========================== CONFIG ===========================
+  // 01-card-pool-deal.md Numbers
+  const COPIES_PER_TYPE = 4;
+  const HAND_START = 11;                                           // sửa 2026-09-16 (3): 13 → 11
+  // 04-food-score-end.md Numbers
+  const POINTS_BY_SIZE = { 2: 2, 3: 4, 4: 7 };
+  const FIRST_FULL_BONUS = 10;
+  // 03-play-claim.md Numbers
+  const PLAY_REVEAL_MS = 500;
+  // 02-draw-reveal.md Numbers
+  const COOK_MS = 1200;
+  // 05-ai-player.md Numbers
+  const HOLD_MIN_UNSEEN = 2;
+  const COURSE_WEIGHT = 2;
+  const DUPLICATE_FACTOR = 0.4;
+  const NOISE = 0.3;
+  const AI_STEP_MS = 900;                                           // fixed, no Speed control (05 Rule 6)
+  // ui/table.md animation timings (GUESS)
+  const T = { draw: 300, play: 300, discard: 250, stackFly: 180, collect: 500, deal: 180, dealStagger: 30, newRing: 1500, toast: 2500, tip: 4000, fanClose: 260 };
+  const STACK_DY = 16;                                              // ui/table.md: legacy vertical offset, kept for hand-in-progress food swap math
+  const PREP_W = 76, PREP_H = 106;
+  const FAN_DX = 40, FAN_ROT = 6, FAN_DIP = 5, FAN_H = PREP_H + 26;   // sửa (4): table stack is a horizontal mini-fan, not a vertical pile
+
+  const CARDS = {
+    rice:['Rice','Gao.jpg'], broken_rice:['Broken Rice','GaoTam.jpeg'], sticky_rice:['Sticky Rice','Nep.jpg'],
+    rice_noodle:['Rice Noodle','RiceNoodle.jpg'], vermicelli:['Vermicelli','Vermicelli.jpg'], bread:['Bread','Bread.jpeg'],
+    rice_flour:['Rice Flour','RiceFlour.jpg'], rice_paper:['Rice Paper','RicePaper.jpeg'], beef:['Beef','Beef.jpg'],
+    pork:['Pork','Pork.jpeg'], pork_belly:['Pork Belly','PorkBelly.jpg'], chicken:['Chicken','Chicken.jpg'],
+    shrimp:['Shrimp','Shrimp.jpeg'], crab:['Crab','Crab.jpg'], herb:['Herb','Herb.jpeg'], mushroom:['Mushroom','Mushroom.jpg'],
+    bean:['Bean','Bean.jpeg'], coconut_milk:['Coconut Milk','CoconutMilk.jpeg'], coffee_bean:['Coffee Bean','CoffeeBean.jpg'],
+    milk:['Milk','Milk.jpeg'], ice:['Ice','Ice.png'], lemongrass:['Lemongrass','Lemongrass.webp'], chili:['Chili','Chilli.jpeg'],
+    fish_sauce:['Fish Sauce','FishSauce.jpg'], sugar:['Sugar','Sugar.jpg'], water:['Water','Water.jpg'], gac_fruit:['Gac Fruit','GacFruit.webp']
+  };
+  const TYPE_ORDER = Object.keys(CARDS);
+
+  const RECIPES = [
+    { dish: 'Goi Cuon',         c: 'A', types: ['rice_paper', 'shrimp', 'herb', 'vermicelli'], img: 'GoiCuon.webp' },
+    { dish: 'Nem Ran',          c: 'A', types: ['rice_paper', 'pork', 'mushroom'],             img: 'NemRan.jpeg' },
+    { dish: 'Cha Gio',          c: 'A', types: ['rice_paper', 'pork', 'herb'],                 img: 'ChaGio.jpg' },
+    { dish: 'Banh Cuon',        c: 'A', types: ['rice_flour', 'pork', 'mushroom'],             img: 'BanhCuon.jpeg' },
+    { dish: 'Banh Xeo',         c: 'A', types: ['rice_flour', 'coconut_milk', 'shrimp', 'pork'], img: 'BanhXeo.webp' },
+    { dish: 'Banh Mi',          c: 'A', types: ['bread', 'pork', 'herb'],                      img: 'BanhMi.jpeg' },
+    { dish: 'Pho Bo',           c: 'M', types: ['rice_noodle', 'beef'],                        img: 'PhoBo.jpg' },
+    { dish: 'Bun Bo Hue',       c: 'M', types: ['rice_noodle', 'beef', 'chili', 'lemongrass'], img: 'BunBoHue.jpeg' },
+    { dish: 'Bun Cha',          c: 'M', types: ['vermicelli', 'pork_belly', 'fish_sauce', 'herb'], img: 'BunCha.jpeg' },
+    { dish: 'Com Tam',          c: 'M', types: ['broken_rice', 'pork', 'fish_sauce'],          img: 'ComTam.jpg' },
+    { dish: 'Cao Lau',          c: 'M', types: ['rice_noodle', 'pork', 'herb'],                img: 'CaoLau.jpg' },
+    { dish: 'Mi Quang',         c: 'M', types: ['rice_noodle', 'shrimp', 'pork', 'herb'],      img: 'MiQuang.jpeg' },
+    { dish: 'Hu Tieu Nam Vang', c: 'M', types: ['rice_noodle', 'pork', 'shrimp'],              img: 'HuTieuNamVang.jpg' },
+    { dish: 'Banh Canh Cua',    c: 'M', types: ['rice_flour', 'crab', 'pork'],                 img: 'BanhCanhCua.jpg' },
+    { dish: 'Com Ga Hoi An',    c: 'M', types: ['rice', 'chicken', 'herb'],                    img: 'ComGaHoiAn.jpg' },
+    { dish: 'Chao Ga',          c: 'M', types: ['rice', 'chicken', 'water'],                   img: 'ChaoGa.jpg' },
+    { dish: 'Che Ba Mau',       c: 'D', types: ['bean', 'coconut_milk', 'sugar'],              img: 'CheBaMau.jpg' },
+    { dish: 'Ca Phe Sua Da',    c: 'D', types: ['coffee_bean', 'milk', 'ice'],                 img: 'CaPheSuaDa.jpg' },
+    { dish: 'Xoi Gac',          c: 'D', types: ['sticky_rice', 'gac_fruit'],                   img: 'XoiGac.avif' },
+    { dish: 'Banh Chung',       c: 'D', types: ['sticky_rice', 'pork', 'bean'],                img: 'BanhChung.jpeg' }
+  ];
+  RECIPES.forEach(r => r.pts = POINTS_BY_SIZE[r.types.length]);
+  const COURSE_NAME = { A: 'Appetizer', M: 'Main', D: 'Dessert' };
+  const SEATS = { 2: ['bottom', 'top'], 3: ['bottom', 'top-left', 'top-right'], 4: ['bottom', 'left', 'top', 'right'] };
+
+  // =========================== LOGIC ============================
+  const $ = id => document.getElementById(id);
+  const label = t => CARDS[t][0];
+  const V = (p, verb, third) => p.human ? verb : (third || verb + 's');
+  const noop = () => {};
+
+  let G = null;
+  let gameToken = 0;
+  let pending = null;
+  let UID = 0, GID = 0;
+  let tipDone = false, tipUntil = 0;                                 // ui/table.md empty state: one-time stacking tip per session
+
+  class Abort extends Error {}
+
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  function count(arr, t) { let n = 0; for (const x of arr) if (x === t) n++; return n; }
+  function removeOne(arr, t) { const i = arr.indexOf(t); if (i >= 0) arr.splice(i, 1); }
+  function sortHand(h) { h.sort((a, b) => TYPE_ORDER.indexOf(a) - TYPE_ORDER.indexOf(b)); }
+
+  let tabPaused = false;   // set only by a real visibilitychange (tab blur), not by initial state
+  document.addEventListener('visibilitychange', () => { tabPaused = document.hidden; });
+  // token-guarded wait; pauses while the tab is hidden (ui/table.md edge cases)
+  function wait(ms) {
+    const tok = gameToken;
+    return new Promise((res, rej) => {
+      const done = () => { if (tok !== gameToken) return rej(new Abort()); if (tabPaused) return setTimeout(done, 200); res(); };
+      setTimeout(done, ms);
+    });
+  }
+  const aiStep = () => wait(AI_STEP_MS);
+  function checkToken(tok) { if (tok !== gameToken) throw new Abort(); }
+
+  function humanDecision() { return new Promise((resolve, reject) => { pending = { resolve, reject }; }); }
+  function resolveHuman(v) { const p = pending; pending = null; if (p) p.resolve(v); }
+
+  function formable(hand) { return RECIPES.filter(r => r.types.every(t => hand.includes(t))); }
+  function claimable(hand, card) { return RECIPES.filter(r => r.types.includes(card) && r.types.every(t => t === card || hand.includes(t))); }
+  const hasCourse = (p, c) => p.foods.some(f => f.c === c);
+  const courseCount = p => ['A', 'M', 'D'].filter(c => hasCourse(p, c)).length;
+  const nextIdx = i => (i + 1) % G.players.length;
+  const emptyStk = () => ({ stack: [], food: null, collecting: null, cooking: false, cookStart: 0, arriving: 0 });
+
+  // ---- human hand groups (UI layer over p.hand; p.hand stays the rules truth) ----
+  const newGroup = (cards, table = false) => ({ id: ++GID, cards, table, cooking: false, cookStart: 0, cookR: null, food: null, fresh: false });
+  function insertLoose(me, card) {
+    const oi = TYPE_ORDER.indexOf(card.t);
+    const at = me.groups.findIndex(g => !g.table && !g.food && g.cards.length === 1 && TYPE_ORDER.indexOf(g.cards[0].t) > oi);
+    const g = newGroup([card]);
+    if (at < 0) me.groups.push(g); else me.groups.splice(at, 0, g);
+  }
+  // reconcile groups against p.hand after the engine adds cards (deal, draw); returns the new loose cards
+  function syncHand(me) {
+    const need = me.hand.slice();
+    for (const g of me.groups) {
+      if (g.food) { g.food.types.forEach(t => removeOne(need, t)); continue; }
+      g.cards = g.cards.filter(c => { if (c.claim) return true; const i = need.indexOf(c.t); if (i < 0) return false; need.splice(i, 1); return true; });
+    }
+    me.groups = me.groups.filter(g => g.food || g.cards.length);
+    const added = [];
+    for (const t of need) { const c = { uid: ++UID, t, claim: false }; insertLoose(me, c); added.push(c); }
+    return added;
+  }
+  function findCard(me, uid) {
+    for (const g of me.groups) { const k = g.cards.findIndex(c => c.uid === uid); if (k >= 0) return { g, k, c: g.cards[k] }; }
+    return null;
+  }
+  const groupById = id => G.players[0].groups.find(g => g.id === id);
+  const claimInGroup = me => me.groups.some(g => g.cards.some(c => c.claim));
+  function dropEmptyGroups(me) { me.groups = me.groups.filter(g => g.food || g.cards.length); }
+  function stripClaim(me) {                                         // 03 Rule 13/15: claim card leaves, hand cards stay
+    for (const g of me.groups) {
+      const n = g.cards.length;
+      g.cards = g.cards.filter(c => !c.claim);
+      if (g.cards.length !== n && g.cooking) { g.cooking = false; g.cookR = null; }
+    }
+    dropEmptyGroups(me);
+  }
+  function groupMatch(g) {
+    const types = g.cards.map(c => c.t);
+    return RECIPES.find(r => r.types.length === types.length && r.types.every(t => types.includes(t))) || null;
+  }
+  function mergeReject(tg, t) {                                     // 02 Rule 10 (stacks live on the table)
+    if (!tg) return 'No target';
+    if (!tg.table) return 'Stack cards on the table';
+    if (tg.food) return 'Collect your food first';
+    if (tg.cooking) return 'Cooking…';
+    const types = tg.cards.map(c => c.t).concat([t]);
+    if (new Set(types).size !== types.length) return 'Already in this stack';
+    if (!RECIPES.some(r => types.every(x => r.types.includes(x)))) return 'No recipe uses these together';
+    return null;
+  }
+  function canCook(g) {                                             // 02 Rule 11/14, 03 Rule 11
+    if (!g || g.cooking || g.food || g.cards.length < 2) return null;
+    const me = G.players[0];
+    if (me.groups.some(o => o.cooking)) return null;
+    const r = groupMatch(g); if (!r) return null;
+    const hasClaim = g.cards.some(c => c.claim);
+    if (G.phase === 'play' && !hasClaim) return r;
+    if (G.phase === 'claim' && hasClaim && G.claimOpts && G.claimOpts.opts.includes(r)) return r;
+    return null;
+  }
+
+  function log(msg, cls = '', why = '') {
+    const d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = msg;
+    if (why) { const s = document.createElement('span'); s.className = 'why'; s.textContent = ' — ' + why; d.appendChild(s); }
+    const L = $('log'); L.insertBefore(d, L.firstChild);
+  }
+
+  function newGame() {
+    gameToken++;
+    if (pending) { const p = pending; pending = null; p.reject(new Abort()); }
+    ['endModal'].forEach(id => $(id).classList.remove('show'));
+    $('fx').innerHTML = ''; $('drag-layer').innerHTML = ''; drag = null;
+    document.querySelectorAll('.pop,.smoke').forEach(e => e.remove());
+    $('toast').classList.remove('show');
+    $('log').innerHTML = '';
+    $('my-panel').classList.remove('hot');
+    document.querySelectorAll('#hand-fan > .hgroup, #prep > .hgroup').forEach(e => e.remove());
+    foodsKey = '';
+    const n = +$('numPlayers').value;
+    const deck = [];
+    TYPE_ORDER.forEach(t => { for (let i = 0; i < COPIES_PER_TYPE; i++) deck.push(t); });
+    shuffle(deck);
+    const players = [];
+    for (let i = 0; i < n; i++) players.push({ idx: i, name: i === 0 ? 'You' : 'Bot ' + i, human: i === 0, hand: [], foods: [], score: 0, bonus: 0, stk: emptyStk(), groups: [], seat: SEATS[n][i] });
+    for (let k = 0; k < HAND_START; k++) for (const p of players) p.hand.push(deck.pop());
+    players.forEach(p => sortHand(p.hand));
+    syncHand(players[0]);
+    G = { players, pool: deck, discard: [], current: Math.floor(Math.random() * n), turn: 0, claims: 0,
+      ended: false, lastPlayed: null, lastBy: null, newUid: null, newAt: 0, phase: 'wait', selected: null, claimOpts: null,
+      dealing: false, dealt: null, dealSkip: false, lastHidden: false, lastJust: false, drawHidden: false, playFrom: null, fanMsg: '',
+      foodIncoming: null };
+    log(`New game: ${n} players, ${HAND_START} cards each, pool ${deck.length}. ${players[G.current].name} starts.`);
+    buildSeats();
+    render();
+    runGame(gameToken).catch(e => { if (!(e instanceof Abort)) { console.error(e); log('ERROR: ' + e.message, 'end'); } });
+  }
+
+  async function runGame(tok) {
+    await dealAnim(tok);
+    while (!G.ended) {
+      checkToken(tok);
+      let p = G.players[G.current];
+      render();
+      if (G.pool.length === 0) {                                    // 04 Rule 4
+        toast('Pool empty'); await wait(700);
+        endGame('pool', null); return;
+      }
+      if (p.human) {
+        G.phase = 'draw'; render();
+        await humanDecision(); checkToken(tok);
+        const card = G.pool.pop();
+        p.hand.push(card); sortHand(p.hand);
+        const [nc] = syncHand(p);
+        G.turn++; G.newUid = nc ? nc.uid : null; G.newAt = Date.now(); G.drawHidden = true;
+        log(`${p.name} ${V(p, 'draw')} ${label(card)}.`);
+        render();
+        await animDrawHuman(card);
+        G.drawHidden = false; render();
+        const uid = G.newUid;
+        setTimeout(() => { if (G && G.newUid === uid) render(); }, T.newRing + 30);
+      } else {
+        await aiStep();
+        await animDrawBot(p);
+        const card = G.pool.pop();
+        p.hand.push(card); sortHand(p.hand);
+        G.turn++;
+        log(`${p.name} ${V(p, 'draw')}.`);
+        render();
+      }
+      await playPhase(p, tok);
+    }
+  }
+
+  async function playPhase(p, tok) {
+    while (true) {
+      const card = await checkAndPlay(p, tok);
+      if (G.ended) return;
+      if (card === null) {                                        // 02 Rule 8
+        log(`${p.name} ${V(p, 'have', 'has')} no cards left to play.`);
+        G.current = nextIdx(p.idx); return;
+      }
+      await animPlay(p, card);
+      G.lastPlayed = card; G.lastBy = p.name; G.lastHidden = false; G.lastJust = true;
+      log(`${p.name} ${V(p, 'play')} ${label(card)}.`, '', p.human ? '' : p._playWhy);
+      render(); G.lastJust = false;
+      await wait(PLAY_REVEAL_MS);
+      const w = await resolveClaims(p, card, tok);
+      if (G.ended) return;
+      if (!w) {                                                   // 03 Rule 8
+        await animDiscard(card);
+        G.discard.push(card); G.lastPlayed = null; render();
+        G.current = nextIdx(p.idx); return;
+      }
+      G.lastPlayed = null; G.lastHidden = false;
+      p = w;                                                      // 03 Rule 6-7
+      G.current = w.idx;
+      render();
+    }
+  }
+
+  async function checkAndPlay(p, tok) {
+    if (p.human) {
+      G.phase = 'play'; G.selected = null;
+      if (!tipDone && !tipUntil) { tipUntil = Date.now() + T.tip; setTimeout(() => { tipDone = true; if (G) render(); }, T.tip + 30); }
+      render();
+      if (p.hand.length === 0) { G.phase = 'wait'; await humanEmptyHand(); render(); return null; }
+      const card = await humanDecision(); checkToken(tok);
+      G.phase = 'wait'; G.selected = null;
+      if (G.ended || card === null) { render(); return null; }
+      removeOne(p.hand, card); render();
+      return card;
+    }
+    while (true) {                                                // 05 Rule 2
+      const pick = aiChooseReveal(p, p.hand);
+      if (!pick) break;
+      await aiStep(); checkToken(tok);
+      await botCook(p, pick.r, pick.why, false);
+      if (G.ended) return null;
+    }
+    if (p.hand.length === 0) return null;
+    await aiStep(); checkToken(tok);
+    const { card, why } = aiChooseDiscard(p);
+    removeOne(p.hand, card);
+    p._playWhy = why;                                              // 05 Rule 7: always logged with the play
+    return card;
+  }
+
+  function revealFood(p, r, why = '', viaClaim = false) {
+    r.types.forEach(t => removeOne(p.hand, t));
+    p.foods.push({ dish: r.dish, c: r.c, pts: r.pts, img: r.img });
+    p.score += r.pts;
+    log(`${p.name} ${viaClaim ? V(p, 'claim') + ' & reveal' + (p.human ? '' : 's') : V(p, 'reveal')} ${r.dish} (${COURSE_NAME[r.c]}) +${r.pts}`, viaClaim ? 'claim' : 'reveal', why);
+    if (courseCount(p) === 3 && !G.ended) {                        // 04 Rule 3
+      p.bonus = FIRST_FULL_BONUS; p.score += FIRST_FULL_BONUS;
+      log(`${p.name} ${V(p, 'have', 'has')} all 3 courses! +${FIRST_FULL_BONUS}`, 'end');
+      endGame('full', p);
+    }
+    render();
+  }
+
+  // 03 Rules 2-5, 11-15. Bots decide first (hidden from the human); the human's bid is locked at Cook press.
+  async function resolveClaims(discarder, card, tok) {
+    const others = [];
+    for (let k = 1; k < G.players.length; k++) others.push(G.players[(discarder.idx + k) % G.players.length]);
+    const bids = [];
+    let humanOpts = null;
+    for (const q of others) {
+      const opts = claimable(q.hand, card).sort((a, b) => b.pts - a.pts);
+      if (!opts.length) continue;
+      if (q.human) { humanOpts = opts; continue; }
+      const hand = q.hand.concat([card]);
+      const r = opts[0];
+      const d = aiShouldReveal(q, r, hand);
+      if (d.reveal) bids.push({ q, r, why: d.why });
+      else log(`${q.name} passes`, 'why', `could claim ${r.dish} but ${d.why}`);
+    }
+    const me = G.players[0];
+    let humanBid = null;
+    if (humanOpts) {
+      G.phase = 'claim'; G.claimOpts = { card, opts: humanOpts, by: discarder.name }; render();
+      const choice = await humanDecision(); checkToken(tok);
+      if (choice) { humanBid = { q: me, r: choice.r, g: choice.g, why: '' }; bids.push(humanBid); }
+      else { log(`You pass on ${label(card)}.`); stripClaim(me); G.phase = 'wait'; G.claimOpts = null; }
+    }
+    render();
+    if (!bids.length) return null;
+    const order = q => others.indexOf(q);
+    bids.sort((a, b) => order(a.q) - order(b.q));
+    let best = bids[0];
+    for (const b of bids) if (b.r.pts > best.r.pts) best = b;       // ties: nearest clockwise
+    if (bids.length > 1) log(`Claim contest on ${label(card)}: ` + bids.map(b => `${b.q.name}→${b.r.dish}(${b.r.pts})`).join(', ') + ` — ${best.q.name} wins`, 'claim');
+
+    if (best === humanBid) {                                       // 03 Rule 14
+      G.claims++;
+      const g = humanBid.g;
+      me.hand.push(card); sortHand(me.hand);
+      g.cards.forEach(c => c.claim = false);
+      G.lastHidden = true;
+      const left = g.cookStart + COOK_MS - Date.now();
+      if (left > 0) await wait(left);
+      checkToken(tok);
+      G.claimOpts = null; G.phase = 'collecting';
+      await finishCook(me, g);
+      await wait(300); checkToken(tok);
+      await collectAnim(me, g, true);                              // ui/table.md: claim win collects automatically
+      return me;
+    }
+    let fromEl = null;
+    if (humanBid) {                                                // 03 Rule 13
+      const g = humanBid.g;
+      const ce = document.querySelector(`#prep .card[data-claim="1"]`);
+      fromEl = ce ? rectOf(ce) : null;
+      stripClaim(me); G.phase = 'wait'; G.claimOpts = null;
+      toast(`${best.q.name} took it — ${best.r.dish} ${best.r.pts} ${best.r.pts > humanBid.r.pts ? '>' : '='} ${humanBid.r.pts}`);
+      render();
+    } else if (humanOpts) { G.phase = 'wait'; G.claimOpts = null; }
+    await aiStep(); checkToken(tok);
+    G.claims++;
+    await animClaimToSeat(best.q, card, fromEl);
+    best.q.hand.push(card); sortHand(best.q.hand);
+    render();
+    await botCook(best.q, best.r, best.why, true);
+    return best.q;
+  }
+
+  // ---- AI (05-ai-player.md) — unchanged ----
+  function seen(bot, t) {
+    let n = count(bot.hand, t) + count(G.discard, t);
+    for (const p of G.players) for (const f of p.foods) if (RECIPES.find(r => r.dish === f.dish).types.includes(t)) n++;
+    if (G.lastPlayed === t) n++;
+    return n;
+  }
+  const unseen = (bot, t) => Math.max(0, COPIES_PER_TYPE - seen(bot, t));
+
+  function aiShouldReveal(bot, r, hand) {
+    const courses = new Set(bot.foods.map(f => f.c)); courses.add(r.c);
+    if (courses.size === 3) return { reveal: true, why: 'completes all 3 courses' };
+    for (const g of RECIPES) {
+      if (g.pts <= r.pts || !r.types.every(t => g.types.includes(t))) continue;
+      const miss = g.types.filter(t => !hand.includes(t));
+      if (miss.length === 1) {
+        const u = unseen(bot, miss[0]);
+        if (u >= HOLD_MIN_UNSEEN) return { reveal: false, why: `holding for ${g.dish}, waiting ${label(miss[0])} (${u} unseen)` };
+      }
+    }
+    return { reveal: true, why: 'best available' };
+  }
+
+  function aiChooseReveal(bot, hand) {
+    const opts = formable(hand).sort((a, b) =>
+      (b.pts - a.pts) || ((hasCourse(bot, a.c) ? 1 : 0) - (hasCourse(bot, b.c) ? 1 : 0)));
+    for (const r of opts) {
+      const d = aiShouldReveal(bot, r, hand);
+      if (d.reveal) return { r, why: d.why };
+      if (!bot._holdLogged || bot._holdLogged !== r.dish + G.turn) { log(`${bot.name} holds ${r.dish}`, 'why', d.why); bot._holdLogged = r.dish + G.turn; }
+    }
+    return null;
+  }
+
+  function aiChooseDiscard(bot) {
+    const scored = [];
+    const seenType = {};
+    for (const c of bot.hand) {
+      let v = 0, bestDish = '-';
+      for (const r of RECIPES) {
+        if (!r.types.includes(c)) continue;
+        const miss = r.types.filter(t => !bot.hand.includes(t));
+        if (miss.some(t => unseen(bot, t) < 1)) continue;
+        const have = r.types.length - miss.length;
+        const val = (have / r.types.length) * r.pts * (hasCourse(bot, r.c) ? 1 : COURSE_WEIGHT);
+        if (val > v) { v = val; bestDish = r.dish; }
+      }
+      if (seenType[c]) v *= DUPLICATE_FACTOR;
+      seenType[c] = true;
+      scored.push({ c, v, noisy: v + (Math.random() * 2 - 1) * NOISE, bestDish });
+    }
+    scored.sort((a, b) => a.noisy - b.noisy);
+    const pick = scored[0];
+    return { card: pick.c, why: `lowest value ${label(pick.c)}=${pick.v.toFixed(2)} (best use: ${pick.bestDish})` };
+  }
+
+  function endGame(reason, finisher) {
+    if (G.ended) return;
+    G.ended = true; G.phase = 'over';
+    log(reason === 'full' ? `Game over — ${finisher.name} completed 3 courses.` : 'Game over — pool empty.', 'end');
+    const ranked = [...G.players].sort((a, b) => b.score - a.score);
+    const top = ranked[0].score;
+    const rows = ranked.map(p => {
+      const foods = p.foods.map(f => `<span class="fitem">${foodThumb(f, 'th')}${f.dish}</span>`).join('') || '—';
+      return `<tr class="${p.score === top ? 'win' : ''}"><td>${p.score === top ? '🏆 ' : ''}<b>${p.name}</b></td><td class="score" style="margin:0">${p.score}</td><td>${p.bonus ? '+' + p.bonus : ''}</td><td>${courseCount(p)}/3</td><td>${foods}</td></tr>`;
+    }).join('');
+    const why = reason === 'full' ? `${finisher.name} completed 3 courses` : 'pool empty';
+    $('endBox').innerHTML = `<h2>Game over — ${why}</h2>
+      <div style="color:var(--text-dim)">${reason === 'full' ? `${finisher.name} completed Appetizer + Main + Dessert first (+${FIRST_FULL_BONUS}).` : 'Pool empty — no finish bonus.'}
+      Turns: ${G.turn} · Claims: ${G.claims} · Pool left: ${G.pool.length}</div>
+      <table class="recipes" style="margin-top:8px"><tr><th>Player</th><th>Score</th><th>Bonus</th><th>Courses</th><th>Foods</th></tr>${rows}</table>
+      <div class="row"><button class="primary" id="btnAgain">Play again</button><button id="btnCloseEnd">View table</button></div>`;
+    $('endModal').classList.add('show');
+    $('btnAgain').addEventListener('pointerup', newGame);
+    $('btnCloseEnd').addEventListener('pointerup', () => $('endModal').classList.remove('show'));
+    if (pending) resolveHuman(null);
+    render();
+  }
+
+  // =========================== RENDER ===========================
+  const BACK_SVG = '<svg viewBox="0 0 64 64" fill="none" stroke="#f0e6d8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="26" cy="40" rx="14" ry="7"/><path d="M12 36 Q26 20 40 36"/><path d="M38 28 Q48 27 47 34 Q46 40 38 38"/><path d="M14 26 Q8 26 8 32 Q8 37 14 36"/><rect x="23" y="12" width="6" height="4" rx="1"/><path d="M46 34 L50 48 L58 48 L60 34 Z"/></svg>';
+  const ingHTML = (t, s, cls = '', attrs = '') =>
+    `<div class="card s-${s} ${cls}" ${attrs}><div class="hdr"><span>${label(t)}</span></div><div class="ph"><img src="Art/Card/${CARDS[t][1]}" alt="" draggable="false"></div></div>`;
+  const backHTML = (s, cls = '', attrs = '') => `<div class="card back s-${s} ${cls}" ${attrs}>${BACK_SVG}</div>`;
+  const foodHTML = (r, s, cls = '', attrs = '') =>
+    `<div class="card food cc-${r.c} s-${s} ${cls}" ${attrs}><div class="cchip">${r.c}</div><div class="hdr"><span>${r.dish}</span></div><div class="ph"><img src="Art/Food/${r.img}" alt="" draggable="false"></div><div class="pchip">+${r.pts}</div></div>`;
+  const foodThumb = (f, size, cls = '') =>
+    `<span class="fcard ${size} cc-${f.c} ${cls}" title="${f.dish} (${COURSE_NAME[f.c]}) +${f.pts}"><img src="Art/Food/${f.img}" alt="" draggable="false"><span class="l">${f.c}</span><span class="p">+${f.pts}</span><span class="n">${f.dish}</span></span>`;
+  function elFrom(html) { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
+  const rectOf = el => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // bot hand cards not currently shown in the bot's mini stack
+  function visHand(p) {
+    const b = p.stk;
+    const excl = (b.food || b.collecting) ? (b.food || b.collecting).types.slice() : b.stack.map(s => s.t);
+    const out = [];
+    p.hand.forEach((t, hi) => { const k = excl.indexOf(t); if (k >= 0) excl.splice(k, 1); else out.push({ t, hi }); });
+    if (G.dealing) return out.slice(0, G.dealt[p.idx]);
+    return out;
+  }
+  function humanCardCount(me) {
+    if (G.dealing) return G.dealt[0];
+    return me.groups.reduce((a, g) => a + g.cards.filter(c => !c.claim).length, 0);
+  }
+
+  function buildSeats() {
+    const box = $('seats'); box.innerHTML = '';
+    for (const p of G.players.slice(1)) {
+      const s = document.createElement('div');
+      s.className = 'seat' + (G.players.length === 2 ? ' two' : '');
+      s.dataset.seat = p.seat; s.dataset.p = p.idx;
+      s.innerHTML = `<div class="seat-head"></div><div class="seat-hand-backs"></div><div class="seat-foods"></div><div class="seat-stack empty"></div>`;
+      box.appendChild(s);
+    }
+    $('center-play').classList.toggle('two', G.players.length === 2);
+  }
+  const seatEl = i => document.querySelector(`.seat[data-p="${i}"]`);
+
+  const coursesHTML = p => `<span class="courses">${['A', 'M', 'D'].map(c => `<span class="course ${c} ${hasCourse(p, c) ? 'have' : ''}" title="${COURSE_NAME[c]}">${c}</span>`).join('')}</span>`;
+  function headHTML(p) {
+    return `<div class="head1"><span class="stool ${p.idx % 2 ? 'b' : 'r'}"></span><span class="plate">${p.name}</span><span class="score" id="score-${p.idx}">${p.score} pts</span></div>
+      <div class="head2"><span class="stat"><span class="backicon"></span>×<b>${visHand(p).length}</b></span>${coursesHTML(p)}</div>`;
+  }
+
+  function progHTML(start) {
+    const el = Date.now() - start;
+    return `<div class="prog"><i style="animation-duration:${COOK_MS}ms;animation-delay:-${Math.min(el, COOK_MS)}ms"></i></div><div class="steam"><span></span><span></span><span></span></div>`;
+  }
+
+  let renderQueued = false;
+  function softRender() { if (renderQueued) return; renderQueued = true; setTimeout(() => { renderQueued = false; render(); }, 16); }
+  let foodsKey = '';
+
+  function render() {
+    if (!G) return;
+    const n = G.players.length;
+    const undealt = G.dealing ? HAND_START * n - G.dealt.reduce((a, b) => a + b, 0) : 0;
+    const poolShown = G.pool.length + undealt;
+    $('cTurn').textContent = G.turn;
+    const me = G.players[0];
+
+    // ---- center ----
+    const pp = $('pool-pile');
+    pp.classList.toggle('glow', G.phase === 'draw');
+    pp.classList.toggle('dashed', poolShown === 0);
+    pp.innerHTML = poolShown === 0 ? '<span class="lbl">Pool empty</span>'
+      : [2, 1, 0].filter(k => poolShown > k).map(k => backHTML('center', '', `style="left:${k * 2}px;top:${-k * 2}px" ${k === 0 ? 'data-act="pool"' : ''}`)).join('') + `<span class="lbl">Pool ${poolShown}</span>`;
+    const ls = $('last-slot');
+    let lh = '';
+    if (G.lastPlayed && !G.lastHidden && !claimInGroup(me)) {
+      const cls = (G.phase === 'claim' ? 'claimable' : '') + (G.lastJust ? ' just shine' : '');
+      const hid = drag && drag.src.kind === 'claim' && drag.ghost ? 'incoming' : '';
+      lh = ingHTML(G.lastPlayed, 'center', cls + ' ' + hid, G.phase === 'claim' ? 'data-drag="claim"' : '') + `<span class="lbl">by ${G.lastBy}</span>`;
+    } else if (!G.lastPlayed) lh = G.phase === 'play' ? '<span class="lbl">Drag here to play</span>' : '<span class="lbl" style="opacity:.6">Last played</span>';
+    if (G.phase === 'claim') lh += '<button class="pass" id="btnPass" data-act="pass">Pass</button>';
+    ls.innerHTML = lh;
+    ls.classList.toggle('play-target', G.phase === 'play' && !G.lastPlayed);
+    ls.classList.toggle('dashed', !G.lastPlayed);
+    const dsc = $('discard-slot');
+    const older = G.discard.slice(-6, -1);
+    dsc.innerHTML = G.discard.length ? older.map((t, i) => {
+      const age = older.length - i;
+      return ingHTML(t, 'disc', '', `style="left:${40 + age * 3}px;top:${-4 + age * 8}px;opacity:${Math.max(.35, 1 - age * .13)};rotate:${age * 4}deg"`);
+    }).join('') + ingHTML(G.discard[G.discard.length - 1], 'center', '', 'style="left:0;top:0"') + `<span class="lbl">Discard</span>`
+      : '<span class="lbl" style="opacity:.6">Discard</span>';
+    dsc.classList.toggle('dashed', !G.discard.length);
+
+    // ---- bots ----
+    for (const p of G.players.slice(1)) {
+      const s = seatEl(p.idx); if (!s) continue;
+      s.classList.toggle('active', G.current === p.idx && !G.ended && !G.dealing);
+      s.querySelector('.seat-head').innerHTML = headHTML(p);
+      const vh = visHand(p);
+      const bk = s.querySelector('.seat-hand-backs');
+      const W = bk.clientWidth - 40;
+      const faces = G.ended;                                       // flip only at GAME_END
+      const off = vh.length > 1 ? Math.min(faces ? 20 : 12, W / (vh.length - 1)) : 0;
+      bk.innerHTML = vh.map((c, i) => faces ? ingHTML(c.t, 'mini', '', `style="left:${i * off}px"`) : backHTML('mini', '', `style="left:${i * off}px"`)).join('');
+      bk.dataset.next = vh.length * off;
+      s.querySelector('.seat-foods').innerHTML = p.foods.map(f => foodThumb(f, 'xs')).join('');
+      const be = s.querySelector('.seat-stack');
+      const b = p.stk;
+      be.classList.toggle('empty', !b.stack.length && !b.food);
+      if (b.food) be.innerHTML = `<div class="stack" style="height:67px">${foodHTML(b.food, 'bstk', 'pop-in shine')}</div>`;
+      else if (b.stack.length) {
+        be.innerHTML = `<div class="stack" style="height:${67 + 12 * (b.stack.length - 1)}px">` + (b.cooking ? progHTML(b.cookStart) : '') +
+          b.stack.map((c, i) => ingHTML(c.t, 'bstk', (b.cooking ? 'locked ' : '') + (i >= b.stack.length - b.arriving ? 'incoming' : ''), `style="top:${i * 12}px"`)).join('') + '</div>';
+      } else be.innerHTML = '';
+    }
+
+    // ---- human panel ----
+    $('dock').classList.toggle('active', G.current === 0 && !G.ended && !G.dealing);
+    $('my-h1').innerHTML = `<span class="stool r"></span><span class="plate">${me.name}</span><span class="score" id="score-0">${me.score} pts</span>`;
+    $('my-h2').innerHTML = coursesHTML(me);
+    $('my-h3').innerHTML = `<span class="stat"><span class="backicon"></span>×<b>${humanCardCount(me)}</b></span>`;
+    const fk = me.foods.length + '|' + (G.foodIncoming ? G.foodIncoming.dish : '');
+    if (fk !== foodsKey) {
+      foodsKey = fk;
+      const mf = $('my-foods');
+      mf.innerHTML = me.foods.map(f => foodThumb(f, 'sm')).join('') + (G.foodIncoming ? foodThumb(G.foodIncoming, 'sm', 'incoming') : '');
+      mf.scrollTop = mf.scrollHeight;
+    }
+
+    renderFan(me);
+  }
+
+  function renderFan(me) {
+    const fan = $('hand-fan'), ui = $('fan-ui');
+    const live = G.phase === 'play' || G.phase === 'claim';
+    fan.classList.toggle('live', live);
+    const W = fan.clientWidth, H = fan.clientHeight;
+    const hand = me.groups.filter(g => !g.table);
+    const groups = G.dealing ? hand.slice(0, G.dealt[0]) : hand;
+    const n = groups.length;
+    const FW = W - 64;
+    const sp = n > 1 ? clamp((FW - 96) / (n - 1), 44, 70) : 0;         // ui/table.md: tight overlapping fan (sửa (3): max 130 → 70)
+    const total = 96 + sp * (n - 1);
+    // sửa (4): centre on the table (alu-table), not on the fan's own flex box — #my-panel eats the left
+    // side of the dock, so a self-centred fan reads as shifted right; re-anchored on every render, so a
+    // play/draw that changes card count always re-centres on the table automatically.
+    const tableR = rectOf($('alu-table')), fanR = rectOf(fan);
+    const tableCenter = tableR.left + tableR.width / 2 - fanR.left;
+    const x0 = clamp(tableCenter - total / 2, 0, Math.max(0, W - total)), mid = (n - 1) / 2;
+    const rotStep = Math.min(3, 28 / Math.max(n, 1));
+    const base = Math.max(2, H - 134 - 4);
+    const dip = mid > 0 ? 12 / (mid * mid) : 0;
+    let useful = new Set();
+    if (G.phase === 'play') useful = new Set(formable(me.hand).flatMap(r => r.types));
+    if (G.phase === 'claim' && G.claimOpts) useful = new Set(G.claimOpts.opts.flatMap(r => r.types).filter(t => t !== G.claimOpts.card));
+    const newOn = G.newUid !== null && Date.now() - G.newAt < T.newRing;
+    const keep = new Map();
+    fan.querySelectorAll(':scope > .hgroup').forEach(e => keep.set(e.dataset.gid, e));
+    let uiHtml = '';
+    groups.forEach((g, i) => {
+      const d = i - mid;
+      const x = x0 + i * sp, yb = base + d * d * dip, r = d * rotStep;
+      const cnt = g.food ? 1 : g.cards.length;
+      const hStack = 134 + STACK_DY * (cnt - 1);
+      const yTop = yb - STACK_DY * (cnt - 1);
+      let el = keep.get(String(g.id));
+      if (el) keep.delete(String(g.id));
+      else { el = document.createElement('div'); el.dataset.gid = g.id; el.innerHTML = '<div class="wob"></div>'; fan.insertBefore(el, ui); }
+      const hint = ['drop-ok', 'drop-bad'].filter(c => el.classList.contains(c));
+      el.className = 'hgroup' + (cnt > 1 ? ' stack' : '') + (g.cooking ? ' locked' : '') + (hint.length ? ' ' + hint.join(' ') : '');
+      el.style.cssText = `--x:${x}px;--y:${yTop}px;--r:${r}deg;height:${hStack}px;z-index:${i + 1}`;
+      const wob = el.firstChild;
+      wob.style.animationDelay = `-${(i * .37) % 2.6}s`;
+      let inner = '';
+      {
+        g.cards.forEach((c, k) => {
+          const cls = [];
+          const top = k === cnt - 1;
+          if (top) cls.push('top');
+          if (g.cooking) cls.push('locked');
+          if (c.claim) cls.push('claimable');
+          else if (useful.has(c.t) && !g.cooking) cls.push('useful');
+          const isNew = c.uid === G.newUid;
+          if (isNew && newOn) cls.push('new');
+          if ((isNew && G.drawHidden) || c.arriving || (drag && drag.ghost && drag.src.uid === c.uid)) cls.push('incoming');
+          if (c.settle) { cls.push('settle'); c.settle = false; }
+          inner += ingHTML(c.t, 'hand', cls.join(' '), `style="top:${k * STACK_DY}px" data-drag="hand" data-uid="${c.uid}" ${c.claim ? 'data-claim="1"' : ''}`);
+        });
+        if (g.cooking) inner = progHTML(g.cookStart) + inner;
+      }
+      wob.innerHTML = inner;
+    });
+    keep.forEach(e => e.remove());
+    if (G.fanMsg) uiHtml += `<div class="fan-msg">${G.fanMsg}</div>`;
+    ui.innerHTML = uiHtml;
+    renderPrep(me, useful, newOn);
+  }
+
+  // table stacks (02 Rule 9–15, sửa (4)): each stack is its own small horizontal fan (not a vertical
+  // pile), slotted around the table's horizontal centre — see ui/table.md Tuning pass (4)
+  function renderPrep(me, useful, newOn) {
+    const box = $('prep');
+    const W = box.clientWidth, H = box.clientHeight;
+    const groups = me.groups.filter(g => g.table);
+    const n = groups.length;
+    const keep = new Map();
+    box.querySelectorAll(':scope > .hgroup').forEach(e => keep.set(e.dataset.gid, e));
+    const cookable = groups.map(g => canCook(g));
+    let uiHtml = '';
+    groups.forEach((g, i) => {
+      const cnt = g.food ? 1 : g.cards.length;
+      const mid = (cnt - 1) / 2;
+      const fanW = g.food ? PREP_W : PREP_W + FAN_DX * (cnt - 1);
+      const x = W / 2 - fanW / 2, yTop = (H - FAN_H) / 2;           // sửa (5): the one stack sits centred in the cook zone
+      let el = keep.get(String(g.id));
+      if (el) keep.delete(String(g.id));
+      else { el = document.createElement('div'); el.dataset.gid = g.id; el.innerHTML = '<div class="wob"></div>'; box.appendChild(el); }
+      const hint = ['drop-ok', 'drop-bad'].filter(c => el.classList.contains(c));
+      el.className = 'hgroup' + (cnt > 1 ? ' stack' : '') + (g.cooking ? ' locked' : '') + (hint.length ? ' ' + hint.join(' ') : '');
+      el.style.cssText = `--x:${x}px;--y:${yTop}px;--r:0deg;width:${fanW}px;height:${FAN_H}px;z-index:${i + 1}`;
+      const wob = el.firstChild;
+      wob.style.animation = 'none';
+      let inner = '';
+      if (g.food) {
+        const hid = drag && drag.ghost && drag.src.kind === 'food' && drag.src.gid === g.id;
+        inner = foodHTML(g.food, 'prep', 'top useful' + (g.fresh ? ' pop-in shine' : '') + (hid ? ' incoming' : ''), `data-drag="food" data-gid="${g.id}" style="left:0;top:${(FAN_H - PREP_H) / 2}px"`);
+        g.fresh = false;
+      } else {
+        const dip = mid > 0 ? FAN_DIP / (mid * mid) : 0;
+        g.cards.forEach((c, k) => {
+          const cls = [];
+          if (k === cnt - 1) cls.push('top');
+          if (g.cooking) cls.push('locked');
+          if (c.claim) cls.push('claimable');
+          else if (useful.has(c.t) && !g.cooking) cls.push('useful');
+          if (c.arriving || (drag && drag.ghost && drag.src.uid === c.uid)) cls.push('incoming');
+          if (c.settle) { cls.push('settle'); c.settle = false; }
+          const d = k - mid, rot = d * FAN_ROT, y = (FAN_H - PREP_H) / 2 + d * d * dip;
+          inner += ingHTML(c.t, 'prep', cls.join(' '), `style="left:${k * FAN_DX}px;top:${y}px;transform:rotate(${rot}deg)" data-drag="hand" data-uid="${c.uid}" ${c.claim ? 'data-claim="1"' : ''}`);
+        });
+        if (g.cooking) inner = progHTML(g.cookStart) + inner;
+      }
+      wob.innerHTML = inner;
+      const cr = cookable[i];
+      const maxW = 240;
+      if (cr) uiHtml += `<button class="primary cookbtn" data-act="cook" data-gid="${g.id}" title="Cook ${cr.dish} +${cr.pts}" style="left:${x + fanW / 2}px;top:${yTop + FAN_H - 22}px;transform:translateX(-50%);max-width:${maxW}px">Cook ${cr.dish} +${cr.pts}</button>`;
+    });
+    keep.forEach(e => e.remove());
+    box.querySelectorAll(':scope > .cookbtn, :scope > .prep-tip').forEach(e => e.remove());
+    if (!n && !tipDone && Date.now() < tipUntil && G.phase === 'play') uiHtml += `<div class="prep-tip">Stack here to cook</div>`;
+    box.insertAdjacentHTML('beforeend', uiHtml);
+  }
+
+  function renderRecipes() {
+    const me = G ? G.players[0] : null;
+    const rows = ['A', 'M', 'D'].map(c => RECIPES.filter(r => r.c === c).map(r => {
+      const can = me && r.types.every(t => me.hand.includes(t));
+      return `<tr class="${can ? 'can' : ''}"><td><span class="sw cc-${c}"></span><b>${c}</b> ${COURSE_NAME[c]}</td><td>${foodThumb(r, 'th')} <b>${r.dish}</b></td><td>+${r.pts}</td><td>${r.types.map(label).join(' + ')}</td></tr>`;
+    }).join('')).join('');
+    $('recipeBox').innerHTML = `<h2>Recipes <span style="font-size:12px;color:var(--gold)">(gold = in your hand now)</span></h2>
+      <table class="recipes"><tr><th>Course</th><th>Food</th><th>Pts</th><th>Ingredients</th></tr>${rows}</table>
+      <div style="margin-top:8px;font-size:12px;color:var(--text-dim)">${COPIES_PER_TYPE} copies of each ingredient. First to own all 3 courses: +${FIRST_FULL_BONUS}, game ends.</div>
+      <div class="row"><button id="btnCloseRec">Close</button></div>`;
+    $('btnCloseRec').addEventListener('pointerup', () => $('recipeModal').classList.remove('show'));
+  }
+
+  // =========================== ANIMATION ===========================
+  const sized = (r, w, h) => ({ left: r.left + (r.width - w) / 2, top: r.top + (r.height - h) / 2, width: w, height: h });
+
+  // curved card flight (quadratic arc), token-guarded; target coords fixed at start (ui/table.md resize rule)
+  function fly(html, from, to, ms, opt = {}) {
+    const el = elFrom(html);
+    el.style.cssText += `;position:fixed;left:${from.left}px;top:${from.top}px;width:${from.width}px;height:${from.height}px;margin:0;transform-origin:0 0;`;
+    $('fx').appendChild(el);
+    const dx = to.left - from.left, dy = to.top - from.top, sx = to.width / from.width, sy = to.height / from.height;
+    const arc = opt.arc ?? Math.min(140, Math.hypot(dx, dy) * .25 + 20);
+    const cx = dx / 2, cy = dy / 2 - arc;
+    const frames = [];
+    for (let i = 0; i <= 14; i++) {
+      const t = i / 14, u = 1 - t;
+      const x = 2 * u * t * cx + t * t * dx, y = 2 * u * t * cy + t * t * dy;
+      const rot = (opt.spin || 0) * Math.sin(Math.PI * t);
+      frames.push({ transform: `translate(${x}px,${y}px) rotate(${rot}deg) scale(${1 + (sx - 1) * t},${1 + (sy - 1) * t})` });
+    }
+    el.animate(frames, { duration: ms, easing: opt.easing || 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
+    return wait(ms).finally(() => el.remove());
+  }
+
+  function backsTarget(p) {
+    if (p.idx === 0) return sized(rectOf($('hand-fan')), 40, 56);
+    const bk = seatEl(p.idx).querySelector('.seat-hand-backs');
+    const r = rectOf(bk);
+    return { left: r.left + Math.min(+bk.dataset.next || 0, r.width - 40), top: r.top + 1, width: 40, height: 56 };
+  }
+
+  async function dealAnim(tok) {
+    const n = G.players.length;
+    G.dealing = true; G.dealt = G.players.map(() => 0); G.dealSkip = false; render();
+    await wait(200);
+    const poolR = rectOf($('pool-pile'));
+    for (let k = 0; k < HAND_START && !G.dealSkip; k++) for (let j = 0; j < n && !G.dealSkip; j++) {
+      const i = (G.current + j) % n, p = G.players[i];
+      const to = p.human ? sized(rectOf($('hand-fan')), 96, 134) : backsTarget(p);
+      fly(backHTML(p.human ? 'center' : 'mini'), p.human ? poolR : sized(poolR, 40, 56), to, T.deal, { arc: 30, spin: p.human ? 0 : 8 })
+        .then(() => { if (G.dealing) { G.dealt[i]++; softRender(); } }).catch(noop);
+      await wait(T.dealStagger);
+    }
+    if (G.dealSkip) $('fx').innerHTML = '';
+    else await wait(T.deal + 60);
+    checkToken(tok);
+    G.dealing = false; G.dealt = null; render();
+  }
+
+  async function animDrawHuman(card) {
+    const el = $('hand-fan').querySelector(`.card[data-uid="${G.newUid}"]`);
+    const to = el ? rectOf(el) : sized(rectOf($('hand-fan')), 96, 134);
+    await fly(ingHTML(card, 'center', 'shine'), rectOf($('pool-pile')), to, T.draw);
+  }
+  async function animDrawBot(p) {
+    await fly(backHTML('center'), rectOf($('pool-pile')), backsTarget(p), T.draw);
+  }
+  async function animPlay(p, card) {
+    const to = rectOf($('last-slot'));
+    const from = p.human ? (G.playFrom || sized(rectOf($('hand-fan')), 96, 134)) : backsTarget(p);
+    G.playFrom = null;
+    await fly(ingHTML(card, p.human ? 'hand' : 'mini'), from, to, T.play);
+  }
+  async function animDiscard(card) {
+    G.lastHidden = true; render();
+    await fly(ingHTML(card, 'center'), rectOf($('last-slot')), rectOf($('discard-slot')), T.discard, { arc: 20 });
+  }
+  async function animClaimToSeat(q, card, fromRect) {
+    G.lastHidden = true; render();
+    const from = fromRect || rectOf($('last-slot'));
+    await fly(ingHTML(card, 'center'), from, backsTarget(q), 300);
+  }
+
+  // 02 Rule 15: bots show mini stack → progress → food card at .seat-stack → into .seat-foods
+  async function botCook(p, r, why, viaClaim) {
+    const b = p.stk;
+    const s = seatEl(p.idx);
+    const fromR = backsTarget(p);
+    b.stack = r.types.map(t => ({ t })); b.arriving = b.stack.length; render();
+    for (let i = 0; i < b.stack.length; i++) {
+      const cards = s.querySelectorAll('.seat-stack .stack .card');
+      await fly(ingHTML(b.stack[i].t, 'bstk'), fromR, rectOf(cards[i]), T.stackFly, { arc: 16 });
+      b.arriving--; render();
+    }
+    await wait(200);
+    b.cooking = true; b.cookStart = Date.now(); render();
+    await wait(COOK_MS);
+    b.cooking = false; b.stack = []; b.food = r; render();
+    smokeAt(rectOf(s.querySelector('.seat-stack')));
+    await wait(450);
+    const fromF = rectOf(s.querySelector('.seat-stack .card'));
+    b.food = null; b.collecting = r; render();
+    const fr = rectOf(s.querySelector('.seat-foods'));
+    const fs = 44;
+    const to = { left: fr.left + Math.min(p.foods.length * (fs + 4), fr.width - fs), top: fr.top + (fr.height - fs) / 2, width: fs, height: fs };
+    await fly(foodHTML(r, 'bstk'), fromF, { left: to.left, top: to.top, width: 48, height: 67 }, 400);
+    b.collecting = null;
+    revealFood(p, r, why, viaClaim);
+    scorePop(to, 'score-' + p.idx, r);
+  }
+
+  // sửa (4): "đóng quạt lại rồi biến thành food card" — the fan of ingredient cards collapses shut in
+  // place (scaleX toward its own centre), then the group swaps to the food card (existing pop-in+shine)
+  async function finishCook(me, g) {
+    const el = document.querySelector(`#prep .hgroup[data-gid="${g.id}"]`);
+    if (el) {
+      const anim = el.animate([
+        { transform: 'scaleX(1)' },
+        { transform: 'scaleX(.1)', offset: .8 },
+        { transform: 'scaleX(.1) scaleY(.92)' }
+      ], { duration: T.fanClose, easing: 'ease-in', fill: 'forwards' });
+      const tok = gameToken;
+      await anim.finished.catch(noop);
+      anim.cancel();                                                // fill:forwards would otherwise leave the squash on the food card that replaces it
+      checkToken(tok);
+    }
+    g.cooking = false; g.food = g.cookR; g.cards = []; g.fresh = true;
+    render();
+    if (el) smokeAt(rectOf(el));
+  }
+
+  // 02 Rule 12: food card → #my-foods = the official reveal
+  async function collectAnim(me, g, viaClaim) {
+    const r = g.food;
+    const el = document.querySelector(`#prep .hgroup[data-gid="${g.id}"] .card`);
+    const fromRect = el ? rectOf(el) : sized(rectOf($('prep')), PREP_W, PREP_H);
+    await collectFly(me, g, r, fromRect, viaClaim);
+  }
+  async function collectFly(me, g, r, fromRect, viaClaim) {
+    const i = me.groups.indexOf(g); if (i >= 0) me.groups.splice(i, 1);
+    G.foodIncoming = r; G.selected = null; render();
+    const ph = $('my-foods').querySelector('.fcard.incoming');
+    const to = ph ? rectOf(ph) : sized(rectOf($('my-foods')), 64, 64);
+    await fly(foodHTML(r, 'hand'), fromRect, { left: to.left, top: to.top, width: 64 * 96 / 134, height: 64 }, T.collect);
+    G.foodIncoming = null;
+    if (!viaClaim) G.phase = 'play';
+    revealFood(me, r, '', viaClaim);
+    scorePop(to, 'score-0', r);
+  }
+
+  function collectFood(g, fromRect) {
+    const me = G.players[0];
+    if (G.phase !== 'play' || !g || !g.food) return;
+    G.phase = 'collecting';
+    const tok = gameToken;
+    collectFly(me, g, g.food, fromRect, false).then(async () => {
+      if (tok !== gameToken || G.ended) return;
+      render();
+      if (me.hand.length === 0) { G.phase = 'wait'; await humanEmptyHand(); resolveHuman(null); }
+    }).catch(e => { if (!(e instanceof Abort)) console.error(e); });
+  }
+
+  function scorePop(fromRect, scoreId, r) {
+    const el = document.createElement('div'); el.className = 'pop';
+    el.innerHTML = `+${r.pts}<small>${r.c}</small>`;
+    const x = fromRect.left + fromRect.width / 2, y = fromRect.top + fromRect.height / 2;
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    document.body.appendChild(el);
+    const t = $(scoreId), tr = t ? rectOf(t) : null;
+    const dx = tr ? tr.left + tr.width / 2 - x : 0, dy = tr ? tr.top + tr.height / 2 - y : -30;
+    el.animate([
+      { transform: 'translate(-50%,-50%) scale(.4)', opacity: 1 },
+      { transform: 'translate(-50%,-50%) scale(1.2)', opacity: 1, offset: .2 },
+      { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: .3 },
+      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.8)`, opacity: .85 }
+    ], { duration: 650, easing: 'ease-in', fill: 'forwards' });
+    setTimeout(() => {
+      el.remove();
+      const s = $(scoreId); if (s) { s.classList.remove('punch'); void s.offsetWidth; s.classList.add('punch'); }
+    }, 650);
+  }
+
+  function smokeAt(r) {
+    for (let i = 0; i < 4; i++) {
+      const s = document.createElement('div'); s.className = 'smoke';
+      s.style.left = (r.left + r.width * (.25 + i * .17) - 9) + 'px'; s.style.top = (r.top + 10) + 'px';
+      document.body.appendChild(s);
+      s.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${(Math.random() - .5) * 16}px,-24px) scale(1.3)`, opacity: 0 }],
+        { duration: 450, easing: 'ease-out', fill: 'forwards' });
+      setTimeout(() => s.remove(), 460);
+    }
+  }
+
+  let toastTimer = 0;
+  function toast(msg, ms = T.toast) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+  }
+
+  async function humanEmptyHand() {
+    G.fanMsg = 'No cards to play — waiting…'; render();
+    await wait(1000);
+    G.fanMsg = '';
+  }
+
+  // =========================== HUMAN INPUT ===========================
+  let drag = null;
+  const app = $('app');
+  const ME = () => G.players[0];
+
+  function playCard(uid, fromRect) {                               // 03 Rule 1
+    if (G.phase !== 'play') return false;
+    const me = ME();
+    if (me.groups.some(g => g.cooking)) { toast('Wait for the cook to finish', 1200); return false; }
+    if (me.groups.some(g => g.food)) { toast('Collect your food first', 1200); return false; }
+    const f = findCard(me, uid); if (!f || f.c.claim || f.k !== f.g.cards.length - 1) return false;
+    f.g.cards.splice(f.k, 1); dropEmptyGroups(me);
+    G.selected = null; G.phase = 'wait'; G.playFrom = fromRect;
+    resolveHuman(f.c.t);
+    return true;
+  }
+
+  function cookPress(gid) {
+    const g = groupById(gid), r = canCook(g); if (!r) return;
+    const me = ME();
+    g.cooking = true; g.cookStart = Date.now(); g.cookR = r;
+    if (G.phase === 'claim') { G.phase = 'claimCook'; render(); resolveHuman({ r, g }); return; }   // 03 Rule 12
+    render();
+    const tok = gameToken;
+    wait(COOK_MS).then(() => { if (tok === gameToken && me.groups.includes(g) && g.cooking) return finishCook(me, g); }).catch(noop);
+  }
+
+  function doAct(el) {
+    if (!G || G.ended) return;
+    const a = el.dataset.act, me = ME();
+    if (a === 'pool' && G.phase === 'draw') { G.phase = 'wait'; render(); resolveHuman(true); }
+    else if (a === 'pass' && G.phase === 'claim') { stripClaim(me); resolveHuman(null); }
+    else if (a === 'cook') cookPress(+el.dataset.gid);
+  }
+
+  function onTap(src) {
+    if (src.kind === 'hand' && src.table) {                          // tap a table card → back to hand
+      if (!src.claim) toHand(ME(), src.uid);
+    }
+    else if (src.kind === 'hand') {
+      if (G.phase === 'play' && !src.claim) {                       // sửa (5): no select/Play button — point at the play zone instead
+        const ls = $('last-slot'); ls.classList.remove('play-flash'); void ls.offsetWidth; ls.classList.add('play-flash');
+        setTimeout(() => ls.classList.remove('play-flash'), 460);
+      }
+    }
+    else if (src.kind === 'claim') toast('Drag it onto a stack on the table to claim', 1500);
+    else if (src.kind === 'food') collectFood(groupById(src.gid), rectOf(src.el));
+  }
+
+  function inRect(el, x, y, pad = 0) {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+  }
+  function hitAt(x, y) {
+    for (const el of document.elementsFromPoint(x, y)) {
+      const g = el.closest('.hgroup');
+      if (g) return { kind: 'group', gid: +g.dataset.gid, el: g };
+      if (el.closest('#my-panel')) return { kind: 'panel' };
+      if (el.closest('#center-play')) return { kind: 'center' };
+    }
+    if (inRect($('center-play'), x, y, 30)) return { kind: 'center' };
+    if (inRect($('my-panel'), x, y, 6)) return { kind: 'panel' };
+    if (inRect($('prep'), x, y, 16)) return { kind: 'table' };       // sửa (5): only the small centred cook zone
+    if (inRect($('hand-fan'), x, y, 20)) return { kind: 'fan' };
+    return null;
+  }
+  function clearHints() {
+    document.querySelectorAll('.hgroup.drop-ok, .hgroup.drop-bad').forEach(e => e.classList.remove('drop-ok', 'drop-bad'));
+    $('my-panel').classList.remove('hot'); $('prep').classList.remove('hot', 'show'); $('last-slot').classList.remove('play-hot');
+  }
+  function flashBad(el) {
+    if (!el) return;
+    el.classList.remove('bad-flash'); void el.offsetWidth; el.classList.add('bad-flash');
+    setTimeout(() => el.classList.remove('bad-flash'), 220);
+  }
+  function consume(d) { const gr = rectOf(d.ghost); d.ghost.remove(); drag = null; return gr; }
+  // take the dragged ingredient card out of wherever it lives (group or center)
+  function takeCard(me, s) {
+    if (s.kind === 'claim') return { uid: ++UID, t: s.t, claim: true };
+    const f = findCard(me, s.uid); if (!f) return null;
+    f.g.cards.splice(f.k, 1); dropEmptyGroups(me);
+    if (G.selected === s.uid) G.selected = null;
+    return f.c;
+  }
+  // returns 'ok' | 'quiet' (cancel, snap back silently) | 'bad' (snap back + shake)
+  function onDrop(d, x, y) {
+    const s = d.src, me = ME();
+    const h = hitAt(x, y);
+    if (s.kind === 'food') {
+      if (h && h.kind === 'panel') { const gr = consume(d); collectFood(groupById(s.gid), gr); return 'ok'; }
+      return 'quiet';                                              // art.md: cancel, not an error
+    }
+    const fromGroup = s.kind === 'hand';
+    const place = (tg, gr) => {                                    // move the dragged card into a table stack (new or existing)
+      const c = takeCard(me, s); if (!c) { render(); return; }
+      c.arriving = true;
+      if (tg) tg.cards.push(c); else me.groups.push(newGroup([c], true));
+      tipDone = true;
+      render();
+      const ce = $('prep').querySelector(`.card[data-uid="${c.uid}"]`);
+      const tok = gameToken;
+      if (ce) fly(ingHTML(c.t, 'prep'), gr, rectOf(ce), T.stackFly, { arc: 10, easing: 'ease-out' })
+        .then(() => { if (tok !== gameToken) return; c.arriving = false; c.settle = true; render(); }).catch(noop);
+      else { c.arriving = false; render(); }
+    };
+    if (h && h.kind === 'group') {                                 // onto a table stack
+      if (fromGroup && h.gid === s.gid) return 'quiet';
+      const tg = groupById(h.gid);
+      if (!tg.table) {                                             // onto a hand card: table card → back to hand, hand card → nothing
+        if (s.table && !s.claim) { consume(d); toHand(me, s.uid); return 'ok'; }
+        if (s.claim && s.table) { consume(d); takeCard(me, s); render(); return 'ok'; }
+        return s.claim ? 'bad' : 'quiet';
+      }
+      const err = mergeReject(tg, s.t);
+      if (err) { flashBad(h.el); toast(err, 1200); return 'bad'; }
+      place(tg, consume(d));
+      return 'ok';
+    }
+    if (h && h.kind === 'table') {                                 // cook zone: start the one stack, or add to it (sửa (5): one stack at a time)
+      const tg = me.groups.find(g => g.table);
+      if (!tg) { place(null, consume(d)); return 'ok'; }
+      if (s.table) return 'quiet';
+      const err = mergeReject(tg, s.t);
+      if (err) { const ge = $('prep').querySelector(`.hgroup[data-gid="${tg.id}"]`); flashBad(ge); toast(err, 1200); return 'bad'; }
+      place(tg, consume(d));
+      return 'ok';
+    }
+    if (s.claim) {                                                 // 03 Rule 15: claim card out of a stack → back to center
+      if (!fromGroup) return h && h.kind === 'center' ? 'quiet' : 'bad';
+      consume(d); takeCard(me, s); render(); return 'ok';
+    }
+    if (h && h.kind === 'center') {
+      if (!s.top) return 'bad';
+      if (G.phase !== 'play') { toast('Not your turn — claim or Pass', 1200); return 'bad'; }
+      const gr = rectOf(d.ghost);
+      if (!playCard(s.uid, gr)) return 'bad';
+      consume(d); render(); return 'ok';
+    }
+    if (h && h.kind === 'fan') {
+      if (!s.table) return 'quiet';
+      consume(d); toHand(me, s.uid); return 'ok';
+    }
+    return 'bad';
+  }
+  function toHand(me, uid) {                                       // 02 Rule 13: card leaves its table stack, back into the hand (sorted)
+    const f = findCard(me, uid); if (!f || !f.g.table || f.g.cooking || f.c.claim) { render(); return; }
+    f.g.cards.splice(f.k, 1); dropEmptyGroups(me);
+    insertLoose(me, f.c);
+    render();
+  }
+
+  function snapBack(d, bad) {
+    const g = d.ghost; d.snapping = true;
+    const gr = rectOf(g);
+    g.style.transform = ''; g.style.opacity = '';
+    if (bad) g.classList.add('invalid');
+    g.animate([{ left: gr.left + 'px', top: gr.top + 'px' }, { left: d.rect.left + 'px', top: d.rect.top + 'px' }], { duration: 200, easing: 'ease-out', fill: 'forwards' });
+    setTimeout(() => { g.remove(); if (drag === d) { drag = null; render(); } }, 210);
+  }
+
+  function tiltLoop() {
+    if (!drag || !drag.ghost || drag.snapping) return;
+    drag.vx *= .85;
+    const target = clamp(drag.vx * .05, -12, 12);
+    drag.tilt += (target - drag.tilt) * .25;
+    drag.ghost.style.transform = `rotate(${drag.tilt}deg) scale(1.05)`;
+    requestAnimationFrame(tiltLoop);
+  }
+
+  app.addEventListener('pointerdown', e => {
+    if (!G) return;
+    if (G.dealing) { G.dealSkip = true; return; }
+    if (e.target.closest('[data-act]') || drag) return;
+    const d = e.target.closest('[data-drag]'); if (!d) return;
+    const kind = d.dataset.drag, me = ME();
+    const src = { kind, el: d };
+    if (kind === 'hand') {
+      if (!['play', 'claim'].includes(G.phase)) return;
+      const f = findCard(me, +d.dataset.uid); if (!f || f.g.cooking) return;
+      if (f.c.claim && G.phase !== 'claim') return;
+      Object.assign(src, { uid: f.c.uid, gid: f.g.id, t: f.c.t, claim: f.c.claim, table: f.g.table, top: f.k === f.g.cards.length - 1, solo: f.g.cards.length === 1 });
+    } else if (kind === 'claim') {
+      if (G.phase !== 'claim' || claimInGroup(me)) return;
+      Object.assign(src, { t: G.lastPlayed, claim: true, gid: null });
+    } else if (kind === 'food') {
+      if (G.phase !== 'play') return;
+      const g = groupById(+d.dataset.gid); if (!g || !g.food) return;
+      src.gid = g.id;
+    } else return;
+    e.preventDefault();
+    try { app.setPointerCapture(e.pointerId); } catch (_) {}
+    drag = { src, id: e.pointerId, x0: e.clientX, y0: e.clientY, lx: e.clientX, lt: performance.now(), vx: 0, tilt: 0, ghost: null, rect: rectOf(d), tok: gameToken };
+  });
+
+  app.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id || drag.snapping) return;
+    const s = drag.src;
+    if (!drag.ghost) {
+      if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
+      const html = s.kind === 'food' ? foodHTML(groupById(s.gid).food, 'prep') : ingHTML(s.t, s.kind === 'claim' ? 'center' : s.table ? 'prep' : 'hand');
+      drag.ghost = elFrom(html);
+      $('drag-layer').appendChild(drag.ghost);
+      if (s.kind === 'hand') G.selected = null;
+      render();
+      requestAnimationFrame(tiltLoop);
+    }
+    const now = performance.now(), dt = Math.max(1, now - drag.lt);
+    drag.vx = drag.vx * .5 + ((e.clientX - drag.lx) / dt * 1000) * .5;
+    drag.lx = e.clientX; drag.lt = now;
+    const g = drag.ghost;
+    g.style.left = (e.clientX - g.offsetWidth / 2 - 20) + 'px';
+    g.style.top = (e.clientY - g.offsetHeight / 2 - 40) + 'px';
+    clearHints();
+    const h = hitAt(e.clientX, e.clientY);
+    g.style.opacity = '';
+    if (s.kind === 'food') { if (h && h.kind === 'panel') $('my-panel').classList.add('hot'); }
+    else if (h && h.kind === 'group' && h.gid !== s.gid && groupById(h.gid).table) {   // art.md valid/invalid drop hint
+      const bad = mergeReject(groupById(h.gid), s.t);
+      h.el.classList.add(bad ? 'drop-bad' : 'drop-ok');
+      if (bad) g.style.opacity = '.6';
+    }
+    else if (h && h.kind === 'table' && !s.table) {
+      const tg = ME().groups.find(q => q.table), bad = tg && mergeReject(tg, s.t);
+      $('prep').classList.add('hot');
+      if (bad) { g.style.opacity = '.6'; const ge = $('prep').querySelector(`.hgroup[data-gid="${tg.id}"]`); if (ge) ge.classList.add('drop-bad'); }
+    }
+    if (s.kind !== 'food') {                                        // sửa (5): show where cards can go while dragging
+      $('prep').classList.add('show');
+      if (G.phase === 'play' && !s.claim && s.top && h && h.kind === 'center') $('last-slot').classList.add('play-hot');
+    }
+  });
+
+  function endDrag(e, cancelled) {
+    const d = drag;
+    try { app.releasePointerCapture(d.id); } catch (_) {}
+    clearHints();
+    if (d.snapping) return;
+    if (d.tok !== gameToken || !G) { drag = null; $('drag-layer').innerHTML = ''; return; }
+    if (!d.ghost) { drag = null; if (!cancelled) onTap(d.src); return; }
+    const res = cancelled ? 'bad' : onDrop(d, e.clientX, e.clientY);
+    if (res !== 'ok' && drag === d) snapBack(d, res === 'bad');
+  }
+
+  app.addEventListener('pointerup', e => {
+    if (drag && e.pointerId === drag.id) { endDrag(e, false); return; }
+    const act = e.target.closest('[data-act]');
+    if (act) doAct(act);
+  });
+  app.addEventListener('pointercancel', e => { if (drag && e.pointerId === drag.id) endDrag(e, true); });
+  app.addEventListener('lostpointercapture', e => { if (drag && e.pointerId === drag.id && !drag.snapping && drag.ghost && drag.ghost.isConnected) endDrag(e, true); });
+
+  // =========================== HUD ===========================
+  $('btnRestart').addEventListener('pointerup', newGame);
+  $('numPlayers').addEventListener('change', newGame);
+  $('btnRecipes').addEventListener('pointerup', () => { renderRecipes(); $('recipeModal').classList.add('show'); });
+  $('btnLog').addEventListener('pointerup', () => $('log-drawer').classList.toggle('open'));
+  $('btnLogClose').addEventListener('pointerup', () => $('log-drawer').classList.remove('open'));
+  let resizeT = 0;
+  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(render, 60); });
+
+  const qp = new URLSearchParams(location.search).get('players');   // optional ?players=2|3|4
+  if (['2', '3', '4'].includes(qp)) $('numPlayers').value = qp;
+  newGame();
+})();
+</script>
+</body>
+</html>
