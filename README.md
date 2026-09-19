@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| **Status** | BUILDING |
+| **Status** | LIVE |
 | **Viewport** | responsive, desktop-first |
 | **Last playtest** | 2026-09-16 (4) — KEEP GOING (deploy để bạn bè test chung) |
-| **Live build** | — (chưa deploy) |
+| **Live build** | https://nghuylychee.github.io/stack-kitchen/ |
 
 Status is one of: `BUILDING` · `PLAYTEST` · `LIVE` · `PAUSED`.
 
