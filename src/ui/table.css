@@ -353,3 +353,40 @@ button.big { min-height:52px; font-size:16px; }
   #my-order { --rowh:36px; gap:1px; } #my-order.n4 { --rowh:30px; } #my-order.n5 { --rowh:24px; }
   .order-chip { width:12px; height:12px; }
 }
+
+/* ---------- 11-match-finale.md — spotlight → confetti → CONGRATULATIONS (before #endModal) ---------- */
+#finale { position:fixed; inset:0; z-index:58; overflow:hidden; cursor:pointer;
+  opacity:0; transition:opacity 280ms ease-out; }
+#finale.on { opacity:1; }
+/* the dim is one huge spread shadow around the hole, so the finisher's zone stays lit (11 Rule 2) */
+#fin-spot { position:fixed; border-radius:14px; animation:finspot 1.3s ease-in-out infinite; }
+@keyframes finspot {
+  0%,100% { box-shadow:0 0 0 100vmax rgba(0,0,0,.84), 0 0 0 3px rgba(242,193,78,.55), 0 0 22px rgba(242,193,78,.35); }
+  50%     { box-shadow:0 0 0 100vmax rgba(0,0,0,.84), 0 0 0 5px rgba(242,193,78,1),   0 0 34px rgba(242,193,78,.6); }
+}
+#fin-order { position:fixed; width:220px; background:var(--panel); border:2px solid var(--gold-soft); border-radius:10px;
+  padding:7px 8px; box-shadow:0 10px 28px rgba(0,0,0,.6); }
+#fin-order .oh { font-size:11px; color:var(--text-dim); letter-spacing:.4px; margin-bottom:3px; }
+#fin-order .fr { display:flex; align-items:center; gap:6px; padding:2px 0; opacity:0; }
+#fin-order .fr.lit { opacity:1; animation:finrow 480ms ease-out; }
+#fin-order .fr img { width:30px; height:30px; object-fit:cover; border-radius:6px; border:1.5px solid var(--gold-soft); flex:none; }
+#fin-order .fr .nm { flex:1; font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#fin-order .fr .st { color:var(--gold); font-weight:900; flex:none; }
+@keyframes finrow { 0% { opacity:0; transform:translateX(-12px) scale(.9); } 60% { opacity:1; transform:none; scale:1.06; } 100% { transform:none; scale:1; } }
+.order-row.finlit { animation:finrowglow 600ms ease-out; }
+@keyframes finrowglow {
+  0%   { box-shadow:0 0 0 0 rgba(242,193,78,.6); scale:1; }
+  50%  { box-shadow:0 0 0 5px rgba(242,193,78,.5); scale:1.05; }
+  100% { box-shadow:0 0 8px rgba(242,193,78,.35); scale:1; }
+}
+/* left/right span the viewport; top/bottom are set per match to the free band beside the spotlight */
+#fin-text { position:absolute; left:0; right:0; top:0; bottom:0; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:16px; }
+#fin-text.on { display:flex; }
+#fin-text.out { animation:finfade var(--finfade,250ms) ease-in forwards; }
+#fin-text .big { font-size:clamp(30px,6.5vw,64px); font-weight:900; letter-spacing:2px; color:var(--gold);
+  text-shadow:0 3px 0 var(--dark), 0 0 26px rgba(242,193,78,.55); animation:fintext 520ms cubic-bezier(.2,1.5,.4,1); }
+#fin-text .sub { margin-top:10px; font-size:clamp(14px,2vw,20px); font-weight:700; color:var(--text);
+  text-shadow:0 2px 8px rgba(0,0,0,.85); animation:fintext 520ms 120ms backwards cubic-bezier(.2,1.5,.4,1); }
+@keyframes fintext { 0% { transform:scale(.4) rotate(-3deg); opacity:0; } 70% { transform:scale(1.1); opacity:1; } 100% { transform:none; } }
+@keyframes finfade { to { opacity:0; } }
+.confetti { position:absolute; top:-28px; width:9px; height:14px; border-radius:2px; pointer-events:none; }

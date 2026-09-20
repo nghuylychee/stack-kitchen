@@ -5,7 +5,7 @@
 //   - sends intents.
 import './table.css';
 import {
-  ART, CARDS, COOK_MS, COURSE_NAME, HAND_SIZE, MENU_HOLD_MS, MENU_ITEM_REVEAL_MS, ORDER_BONUS, ORDER_HOLD_MS, ORDER_ITEM_REVEAL_MS, ORDER_LAND_MS, MENU_LAND_MS, MENU_LAND_STAGGER_MS, ORDER_LAND_STAGGER_MS, REFILL_STAGGER_MS, SEATS, T, TYPE_ORDER,
+  ART, CARDS, COOK_MS, COURSE_NAME, FINALE_CONFETTI_MS, FINALE_ROW_STAGGER_MS, FINALE_SPOTLIGHT_MS, FINALE_TEXT_FADE_MS, FINALE_TEXT_HOLD_MS, HAND_SIZE, MENU_HOLD_MS, MENU_ITEM_REVEAL_MS, ORDER_BONUS, ORDER_HOLD_MS, ORDER_ITEM_REVEAL_MS, ORDER_LAND_MS, MENU_LAND_MS, MENU_LAND_STAGGER_MS, ORDER_LAND_STAGGER_MS, REFILL_STAGGER_MS, SEATS, T, TYPE_ORDER,
   label, recipeByDish, type CardType, type Recipe,
 } from '../core/data';
 import { formable, matchRecipe, orderDone, removeOne, type FoodLike } from '../core/rules';
@@ -792,6 +792,7 @@ async function pump() {
 
 function resetTableDom() {
   $('endModal').classList.remove('show');
+  clearFinale();                                                      // 11-match-finale.md
   $('fx').innerHTML = ''; $('drag-layer').innerHTML = ''; drag = null;
   document.querySelectorAll('.pop,.smoke,.intro-fly').forEach(e => e.remove());
   $('menuIntroModal').classList.remove('leaving'); $('orderIntroModal').classList.remove('leaving');
@@ -1007,8 +1008,10 @@ async function handle(ev: HostEvent) {
       const s = g();
       applyView(ev.view);
       s.phase = 'over'; s.deadline = null; s.claimOpts = null; s.expectPlay = false;
-      showEnd(ev.reason, ev.finisher);
       render();
+      // 11 Rule 1 — Kết thúc A' gets the finale first; Kết thúc B (pool empty) opens #endModal straight away
+      if (ev.reason === 'order' && ev.finisher !== null) await matchFinale(ev.finisher, gameToken);
+      showEnd(ev.reason, ev.finisher);
       return;
     }
   }
@@ -1018,6 +1021,106 @@ const TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#f0e6d8" stroke-w
 const CROSS_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#a89a86" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.4)" stroke="none"/><path d="M7 7 L17 17 M17 7 L7 17"/></svg>';
 const orderThumb = (r: Recipe, done: boolean) =>
   `<span class="othumb ${done ? 'done' : 'miss'}" title="${r.dish}${done ? ' — done' : ' — not done'}"><img src="${ART}Food/${r.img}" alt="" draggable="false">${done ? TICK_SVG : CROSS_SVG}</span>`;
+
+// 11-match-finale.md — Kết thúc A' only: spotlight the finisher, re-light their order one dish at a time,
+// then confetti + CONGRATULATIONS, then #endModal. Client-only (11 Rule 7–8): the match is already over, so
+// nothing on the host waits for this. Tap anywhere skips straight to the table (11 Rule 6), locally only.
+const CONFETTI_COLORS = ['#f2c14e', '#ff8a3d', '#4caf6b', '#c9552c', '#b0559e', '#6fd1ff', '#f0e6d8'];
+
+function clearFinale() {
+  const fin = $('finale');
+  fin.classList.remove('on');
+  fin.hidden = true;
+  fin.querySelectorAll('.confetti').forEach(e => e.remove());
+  const list = $('fin-order'); list.hidden = true; list.innerHTML = '';
+  const text = $('fin-text'); text.className = ''; text.innerHTML = '';
+  document.querySelectorAll('#my-order .order-row.finlit').forEach(e => e.classList.remove('finlit'));
+}
+
+function spawnConfetti(host: HTMLElement) {                           // 11 Rule 3
+  const H = window.innerHeight, total = dur(FINALE_CONFETTI_MS);
+  for (let i = 0; i < 90; i++) {
+    const c = document.createElement('i');
+    c.className = 'confetti';
+    c.style.background = CONFETTI_COLORS[(Math.random() * CONFETTI_COLORS.length) | 0];
+    c.style.left = Math.random() * window.innerWidth + 'px';
+    host.appendChild(c);
+    c.animate([{ transform: 'none', opacity: 1 },
+      { transform: `translate(${Math.random() * 140 - 70}px,${H + 80}px) rotate(${(Math.random() * 4 - 2) * 360}deg)`, opacity: .85 }],
+      { duration: total * (.65 + Math.random() * .5), delay: Math.random() * total * .35, easing: 'cubic-bezier(.25,.6,.5,1)', fill: 'forwards' });
+  }
+}
+
+async function matchFinale(finisher: number, tok: number) {
+  const s = g();
+  const p = s.players[finisher];
+  const mine = finisher === s.you;
+  const fin = $('finale'), list = $('fin-order'), text = $('fin-text');
+  let skipped = false;
+  const onSkip = () => { skipped = true; };
+  const stop = () => skipped || catchUp;
+  fin.addEventListener('pointerup', onSkip);
+  try {
+    const target = mine ? $('my-panel') : seatEl(finisher);
+    if (!target) return;                                              // no zone to spotlight — go straight to #endModal
+    const r = target.getBoundingClientRect(), pad = 10;
+    Object.assign($('fin-spot').style,
+      { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px' });
+    fin.hidden = false;
+    void fin.offsetWidth;                                             // start the dim fade from 0
+    fin.classList.add('on');
+
+    // rows to light: my own #my-order rows, or a floating list beside an opponent's pod (their order is public now, 07 Rule 13)
+    const dishes = recipesOf(p.order || []);
+    let rows = mine ? [...document.querySelectorAll<HTMLElement>('#my-order .order-row')] : [];
+    const cls = mine && rows.length ? 'finlit' : 'lit';
+    if (!rows.length && dishes.length) {
+      list.innerHTML = `<div class="oh">${mine ? 'YOUR ORDER' : (esc(p.name) + "'S ORDER").toUpperCase()}</div>` + dishes.map(d =>
+        `<div class="fr"><img src="${ART}Food/${d.img}" alt="" draggable="false"><span class="nm">${esc(d.dish)}</span><span class="st">✓</span></div>`).join('');
+      list.hidden = false;
+      const lr = list.getBoundingClientRect();
+      const left = Math.min(Math.max(8, r.left + r.width / 2 - lr.width / 2), window.innerWidth - lr.width - 8);
+      const below = r.bottom + 12;
+      list.style.left = left + 'px';
+      list.style.top = (below + lr.height > window.innerHeight - 8 ? Math.max(8, r.top - lr.height - 12) : below) + 'px';
+      rows = [...list.querySelectorAll<HTMLElement>('.fr')];
+    }
+    // keep the text clear of the spotlight + order list: it takes whichever free band is taller
+    const lr2 = list.hidden ? null : list.getBoundingClientRect();
+    const uTop = Math.min(r.top - pad, lr2 ? lr2.top : Infinity), uBot = Math.max(r.bottom + pad, lr2 ? lr2.bottom : 0);
+    const above = uTop, below = window.innerHeight - uBot;
+    if (Math.max(above, below) >= 160) {
+      if (below >= above) { text.style.top = uBot + 'px'; text.style.bottom = '0px'; }
+      else { text.style.top = '0px'; text.style.bottom = window.innerHeight - uTop + 'px'; }
+    }
+
+    await introWait(dur(FINALE_SPOTLIGHT_MS), tok, stop);             // 11 Rule 2 — dim + ring settle
+    checkToken(tok);
+    for (let i = 0; i < rows.length; i++) {
+      if (skipped) return;
+      rows[i].classList.add(cls);
+      if (i < rows.length - 1) await introWait(dur(FINALE_ROW_STAGGER_MS), tok, stop);
+      checkToken(tok);
+    }
+    if (skipped) return;
+
+    // 11 Rule 3 — confetti + the text. It congratulates finishing the order, never "wins": the score table decides that (07 Rule 12).
+    spawnConfetti(fin);
+    text.innerHTML = `<div class="big">CONGRATULATIONS!</div><div class="sub">${mine ? 'You' : esc(p.name)} completed ${mine ? 'your' : 'their'} order</div>`;
+    text.classList.add('on');
+    await introWait(dur(FINALE_TEXT_HOLD_MS), tok, stop);
+    checkToken(tok);
+    if (skipped) return;
+    text.style.setProperty('--finfade', dur(FINALE_TEXT_FADE_MS) + 'ms');
+    text.classList.add('out');
+    await introWait(dur(Math.max(FINALE_CONFETTI_MS - FINALE_TEXT_HOLD_MS, FINALE_TEXT_FADE_MS)), tok, stop);
+    checkToken(tok);
+  } finally {
+    fin.removeEventListener('pointerup', onSkip);
+    fin.classList.remove('on');                                       // dim fades out while #endModal opens over it
+    setTimeout(clearFinale, 320);
+  }
+}
 
 function showEnd(reason: 'order' | 'pool' | null, finisher: number | null) {
   const s = g();

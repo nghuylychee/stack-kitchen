@@ -6,31 +6,43 @@
 <title>Stack Kitchen</title>
 </head>
 <body>
-<!-- ============ HOME ============ -->
-<div id="home" class="screen">
-  <div class="home-box">
-    <h1 class="logo">Stack Kitchen</h1>
-    <p class="tag">Draw, stack and claim ingredients — finish your secret order of dishes from the menu first.</p>
-    <label class="field">Your name <input id="nick" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Chef"></label>
+<!-- ============ RESTAURANT (main screen — design/ui/restaurant.md) ============ -->
+<div id="restaurant" class="screen" hidden>
+  <div id="rest-hud">
+    <input id="rest-name" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Tap to name your chef">
+    <div class="rh-lvl"><span id="rest-level">Level 1</span><span class="xpbar"><i id="rest-xp"></i></span><span id="rest-xptext"></span></div>
+    <div class="rh-gold"><span class="coin"></span><b id="rest-gold">0</b></div>
+    <div class="rh-away" id="rest-away" hidden></div>
+    <div class="rh-hint" id="rest-hint" hidden></div>
+    <div class="rh-warn" id="rest-warn" hidden></div>
+  </div>
 
-    <section class="mode">
-      <h2>Play vs Bots</h2>
+  <div id="rest-stage"><div id="rest-grid"><div id="rest-drop" hidden></div></div></div>
+
+  <div id="rest-nav">
+    <button class="card nav-card" id="navBots" data-pop="pop-bots"><span class="hdr"><span>Play vs Bots</span></span><span class="ph"><span class="phl">VS</span></span></button>
+    <button class="card nav-card" id="navOnline" data-pop="pop-online"><span class="hdr"><span>Online Room</span></span><span class="ph"><span class="phl">ON</span></span></button>
+    <button class="card nav-card" id="navShop"><span class="hdr"><span>Shop</span></span><span class="ph"><span class="phl">SH</span></span></button>
+    <button class="card nav-card" id="navMenu"><span class="hdr"><span>Menu</span></span><span class="ph"><span class="phl">ME</span></span></button>
+  </div>
+
+  <div id="rest-pop" hidden>
+    <div class="pop-body" id="pop-bots" hidden>
       <div class="seg" id="botCount">
         <button data-n="2">2 players</button><button data-n="3">3 players</button><button data-n="4" class="on">4 players</button>
       </div>
       <button class="primary big" id="btnBots">Play</button>
-    </section>
-
-    <section class="mode">
-      <h2>Online room</h2>
+    </div>
+    <div class="pop-body" id="pop-online" hidden>
       <button class="primary big" id="btnCreate">Create room</button>
       <div class="join-row">
         <input id="roomCode" maxlength="5" autocomplete="off" spellcheck="false" placeholder="CODE">
         <button class="big" id="btnJoin">Join</button>
       </div>
-    </section>
-    <div class="home-msg" id="homeMsg"></div>
+    </div>
   </div>
+
+  <div class="home-msg" id="rest-msg"></div>
 </div>
 
 <!-- ============ LOBBY ============ -->
@@ -99,6 +111,10 @@
 <div id="recipe-pop" hidden></div>
 <div class="modal intro" id="menuIntroModal"><div class="box" id="menuIntroBox"></div></div>
 <div class="modal intro" id="orderIntroModal"><div class="box" id="orderIntroBox"></div></div>
+<!-- 11-match-finale.md: spotlight the finisher → confetti + CONGRATULATIONS → #endModal -->
+<div id="finale" hidden><div id="fin-spot"></div><div id="fin-order" hidden></div><div id="fin-text"></div></div>
+<div class="modal" id="shopModal"><div class="box" id="shopBox"></div></div>
+<div class="modal" id="menuModal"><div class="box" id="menuBox"></div></div>
 <div class="modal" id="endModal"><div class="box" id="endBox"></div></div>
 <div class="modal" id="noticeModal"><div class="box" id="noticeBox"></div></div>
 

@@ -69,7 +69,8 @@ gần như không còn chỗ khi `ORDER_SIZE` cao (3-4 người).
 - **Bỏ 3 nút ở `#hud`:** `Restart`, `Menu` (mở `#recipeModal` xem chi tiết công thức — **không phải**
   `#menu-rail`, dải Menu công khai vẫn hiện nguyên suốt ván), `[Log ▸]`. Không còn cách nào mở lại
   `#recipeModal`/`#log-drawer` trong lúc chơi → bỏ luôn 2 overlay này khỏi DOM. `#hud` còn tên game,
-  `#cTurn`, chip phòng/đồng hồ (online) và nút `Home`.
+  `#cTurn`, chip phòng/đồng hồ (online) và nút `Home` — từ 2026-09-20 `Home` quay về **màn quán**
+  (`design/ui/restaurant.md`), không còn màn Home cũ.
   - Hệ quả chấp nhận: lý do quyết định của bot (`why` trong log, vd "feeds rivals", "claims to deny") mất
     hết chỗ hiển thị cho người chơi — host vẫn gửi log message như cũ (không đổi `05-`/`match.ts`), chỉ
     không còn UI nào đọc. Nếu sau này cần lại, thêm lại `[Log ▸]`, không cần đổi luật.

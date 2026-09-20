@@ -14,6 +14,13 @@ export const MENU_LAND_MS = 500;            // Menu shrinks into #menu-rail (10 
 export const MENU_LAND_STAGGER_MS = 40;
 export const ORDER_LAND_MS = 550;           // Order list shrinks into #my-order (10 Rule 5)
 export const ORDER_LAND_STAGGER_MS = 70;
+// 11-match-finale.md — celebration between the `end` event and #endModal, Kết thúc A' only.
+// Client-only: the match is already over, so no host wait() pairs with these (11 Rule 7–8).
+export const FINALE_SPOTLIGHT_MS = 900;     // dim + ring settle before the order rows light up (11 Rule 2)
+export const FINALE_ROW_STAGGER_MS = 220;   // one order row per beat, same cadence as the intro (10)
+export const FINALE_CONFETTI_MS = 1600;     // burst length (11 Rule 3)
+export const FINALE_TEXT_HOLD_MS = 1300;
+export const FINALE_TEXT_FADE_MS = 250;
 // 03-play-claim.md
 export const PLAY_REVEAL_MS = 500;
 // 02-draw-reveal.md

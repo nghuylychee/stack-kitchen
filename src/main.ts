@@ -1,19 +1,34 @@
-// Screens: Home → (Play vs Bots | Create room → Lobby | Join room → Lobby) → Table.
+// Screens: Restaurant → (Play vs Bots | Create room → Lobby | Join room → Lobby) → Table.
+// The restaurant is the meta layer (design/12-restaurant-meta.md); it never reaches core/ or net/.
 import { Match } from './core/match';
 import { RoomClient, RoomHost, cleanCode, type LobbyState } from './net/room';
 import { enterTable, leaveTable, onHostEvent, toast } from './ui/table';
+import { awardMatch, enterRestaurant, playerName, renderRestaurant, restaurantShown, restMsg, setBotCount, setJoinCode, unlockFromMatch } from './ui/restaurant';
 import type { HostEvent } from './core/types';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-const store = {
-  get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
-  set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } },
-};
 
-type Screen = 'home' | 'lobby' | 'app';
+type Screen = 'restaurant' | 'lobby' | 'app';
 function show(s: Screen) {
-  for (const id of ['home', 'lobby', 'app'] as Screen[]) $(id).hidden = id !== s;
+  for (const id of ['restaurant', 'lobby', 'app'] as Screen[]) $(id).hidden = id !== s;
+  restaurantShown(s === 'restaurant');          // 16- Rule 2: khách chỉ sống khi màn quán đang hiện
+}
+
+// ------------------------------------------------------------------ thưởng sau ván (14-)
+// Client tự tính từ `end.view` đã có sẵn — không thêm field vào HostEvent, không hỏi host, không
+// gửi gì qua mạng (14- Rule 2, 10). Match không biết gì về chuyện này (12- Rule 6).
+let endAwarded = false;
+
+function meta(ev: HostEvent) {
+  if (ev.t === 'start') { endAwarded = false; return; }        // Play again = ván mới, thưởng lại được
+  if (ev.t !== 'end' || endAwarded) return;                    // 14- Rule 6: mỗi `end` cộng đúng 1 lần
+  endAwarded = true;
+  const v = ev.view, me = v.players[v.you];
+  if (!me) return;
+  const top = Math.max(...v.players.map(p => p.score));
+  awardMatch(me.score, me.score === top, ev.finisher === v.you);   // hoà nhất vẫn tính thắng (Rule 4)
+  unlockFromMatch(me.foods.map(f => f.dish));                      // 17- Rule 2: nấu được món nào thì quán bán được món đó
 }
 
 // ------------------------------------------------------------------ session
@@ -32,26 +47,22 @@ function endSession() {
   if (url.searchParams.has('room')) { url.searchParams.delete('room'); history.replaceState(null, '', url); }
 }
 
-function goHome(msg = '', ok = false) {
+// 12- Rule 1: the Home screen is gone — leaving a match or a lobby lands back in the restaurant.
+function goRestaurant(msg = '', ok = false) {
   endSession();
-  show('home');
-  const m = $('homeMsg'); m.textContent = msg; m.classList.toggle('ok', ok);
+  show('restaurant');
+  renderRestaurant();
+  restMsg(msg, ok);
 }
 
-const nick = () => {
-  const v = $<HTMLInputElement>('nick').value.trim().slice(0, 12);
-  if (v) store.set('sk-nick', v);
-  return v;
-};
-
 // ------------------------------------------------------------------ offline
-let botCount = 4;
-function startBots() {
+function startBots(n: number) {
   endSession();
-  const seats = Array.from({ length: botCount }, (_, i) => ({ name: i === 0 ? 'You' : `Bot ${i}`, human: i === 0, connected: i === 0 }));
-  const match = new Match(seats, false, (_seat, ev) => onHostEvent(ev));
+  const me = playerName() || 'You';                             // 12- Rule 7: one source for the player's name
+  const seats = Array.from({ length: n }, (_, i) => ({ name: i === 0 ? me : `Bot ${i}`, human: i === 0, connected: i === 0 }));
+  const match = new Match(seats, false, (_seat, ev) => { meta(ev); onHostEvent(ev); });
   offline = match;
-  enterTable({ send: m => match.intent(0, m), onHome: () => goHome(), onAgain: () => match.start(), isHost: true, online: false });
+  enterTable({ send: m => match.intent(0, m), onHome: () => goRestaurant(), onAgain: () => match.start(), isHost: true, online: false });
   onTable = true;
   show('app');
   match.start();
@@ -62,13 +73,14 @@ const tableEvent = (roomCode: string, isHost: boolean) => (ev: HostEvent) => {
   if (!onTable) {
     enterTable({
       send: m => (host ? host.intent(m) : client?.intent(m)),
-      onHome: () => goHome(),
+      onHome: () => goRestaurant(),
       onAgain: () => host?.start(),
       isHost, online: true, roomCode,
     });
     onTable = true;
     show('app');
   }
+  meta(ev);
   onHostEvent(ev);
 };
 
@@ -100,14 +112,19 @@ function renderLobby(s: LobbyState, isHost: boolean) {
     : s.started ? 'Game in progress — reconnecting…' : 'Waiting for the host to start…';
 }
 
+function needName() {                                           // online still needs a name (as before)
+  restMsg('Name your chef first');
+  $<HTMLInputElement>('rest-name').focus();
+}
+
 async function createRoom() {
-  const name = nick();
-  if (!name) { $('homeMsg').textContent = 'Enter your name first'; $('nick').focus(); return; }
+  const name = playerName();
+  if (!name) return needName();
   endSession();
   const h = new RoomHost(name, {
     onLobby: s => renderLobby(s, true),
     onEvent: ev => tableEvent(h.code, true)(ev),
-    onFatal: msg => goHome(msg),
+    onFatal: msg => goRestaurant(msg),
   });
   host = h;
   show('lobby');
@@ -116,19 +133,19 @@ async function createRoom() {
   $('btnStart').hidden = true;
   $('lobbyMsg').textContent = 'Opening room…';
   try { await h.open(); }
-  catch (e) { if (host === h) goHome('Could not open room: ' + (e as Error).message); }
+  catch (e) { if (host === h) goRestaurant('Could not open room: ' + (e as Error).message); }
 }
 
 function joinRoom(codeIn?: string) {
-  const code = cleanCode(codeIn ?? $<HTMLInputElement>('roomCode').value);
-  const name = nick();
-  if (!name) { $('homeMsg').textContent = 'Enter your name first'; $('nick').focus(); return; }
-  if (code.length !== 5) { $('homeMsg').textContent = 'Room code is 5 characters'; $('roomCode').focus(); return; }
+  const code = cleanCode(codeIn ?? '');
+  const name = playerName();
+  if (!name) return needName();
+  if (code.length !== 5) { restMsg('Room code is 5 characters'); $('roomCode').focus(); return; }
   endSession();
   const c = new RoomClient(code, name, {
     onLobby: s => renderLobby(s, false),
     onEvent: tableEvent(code, false),
-    onFatal: msg => goHome(msg),
+    onFatal: msg => goRestaurant(msg),
   });
   client = c;
   show('lobby');
@@ -141,26 +158,15 @@ function joinRoom(codeIn?: string) {
 }
 
 // ------------------------------------------------------------------ wiring
-function segment(boxId: string, onPick: (n: number) => void) {
-  $(boxId).addEventListener('pointerup', e => {
-    const b = (e.target as HTMLElement).closest('button');
-    if (!b || b.disabled) return;
-    $(boxId).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
-    onPick(+b.dataset.n!);
-  });
-}
-
 function init() {
-  const nickEl = $<HTMLInputElement>('nick');
-  nickEl.value = store.get('sk-nick') || '';
-  segment('botCount', n => (botCount = n));
-  segment('seatCount', n => host?.setSize(n));
-  $('btnBots').addEventListener('pointerup', startBots);
-  $('btnCreate').addEventListener('pointerup', createRoom);
-  $('btnJoin').addEventListener('pointerup', () => joinRoom());
-  $('roomCode').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+  enterRestaurant({ onBots: startBots, onCreate: createRoom, onJoin: joinRoom });
+  $('seatCount').addEventListener('pointerup', e => {
+    const b = (e.target as HTMLElement).closest('button');
+    if (!b || (b as HTMLButtonElement).disabled) return;
+    host?.setSize(+b.dataset.n!);
+  });
   $('btnStart').addEventListener('pointerup', () => host?.start());
-  $('btnLeaveLobby').addEventListener('pointerup', () => goHome());
+  $('btnLeaveLobby').addEventListener('pointerup', () => goRestaurant());
   $('btnCopy').addEventListener('pointerup', async () => {
     const v = $<HTMLInputElement>('shareLink').value;
     try { await navigator.clipboard.writeText(v); toast('Link copied', 1200); }
@@ -171,15 +177,14 @@ function init() {
   const params = new URLSearchParams(location.search);
   const room = cleanCode(params.get('room') || '');
   const qp = params.get('players');
-  if (['2', '3', '4'].includes(qp || '')) {
-    botCount = +qp!;
-    $('botCount').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.n === qp));
-  }
-  show('home');
-  if (room.length === 5) {
-    $<HTMLInputElement>('roomCode').value = room;
-    if (nickEl.value) joinRoom(room);
-    else { $('homeMsg').textContent = `Enter your name to join room ${room}`; $('homeMsg').classList.add('ok'); nickEl.focus(); }
+  if (['2', '3', '4'].includes(qp || '')) setBotCount(+qp!);
+
+  show('restaurant');
+  renderRestaurant();
+  if (room.length === 5) {                                      // 12- Rule 10: invite link goes straight to the lobby
+    setJoinCode(room);
+    if (playerName()) joinRoom(room);
+    else { restMsg(`Name your chef to join room ${room}`, true); $<HTMLInputElement>('rest-name').focus(); }
   }
 }
 

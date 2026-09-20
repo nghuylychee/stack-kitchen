@@ -714,3 +714,87 @@ Không có prompt tạo ảnh AI cho pass này — mọi thứ vẫn CSS/SVG/ả
    mục 1) — ngoại lệ mới với luật "course color luôn kèm chữ cái." Cần người
    duyệt xác nhận chấp nhận được, hay ưu tiên bỏ hẳn course badge khỏi
    `.menu-item` (dồn 100% vào popover) thay vì giữ 1 chấm màu đơn độc.
+
+---
+
+## Restaurant meta — bổ sung cho `12-`…`15-` (Status: DRAFT — backlog #24–#27)
+
+**Ngày:** 2026-09-20, theo quyết định trong phiên chat (main menu thành quán của người
+chơi). Đối tượng: `design/12-restaurant-meta.md`, `13-restaurant-grid.md`,
+`15-shop-unlocks.md`, `design/ui/restaurant.md`. Mục này **chỉ thêm**, không sửa gì ở
+các mục phía trên — bàn chơi giữ nguyên 100% ngôn ngữ hình ảnh hiện tại.
+
+**Phạm vi:** người duyệt sẽ tự bổ sung ảnh thật sau, nên mục này chốt **format, token
+màu và quy ước tên file** trước, đủ để `/build` chạy khi trong tay chưa có ảnh nào.
+
+### 1. Ba loại card mới
+
+Tất cả dùng **đúng khung `.card`** của thẻ nguyên liệu (tỉ lệ, bo góc, đổ bóng, ảnh
+full-bleed, nhãn tên chạy dưới đáy) — không phát minh khung mới. Khác nhau **chỉ ở màu
+viền**, để nhìn một phát biết đang xem loại gì:
+
+| Loại | Token | Hex | Dùng cho |
+|---|---|---|---|
+| Facility | `--fac` | `#3f8f8f` | bàn ghế, bếp — thứ có (hoặc sẽ có) tác dụng cơ học |
+| Decoration | `--dec` | `#8a7f6a` | đồ trang trí thuần — nâu xám trung tính, cố ý **không** tranh chú ý với facility |
+| Customer | `--cus` | `#e8a0a0` | khách (đợt 2, `16-`) — hồng đào ấm, tách khỏi `--invalid` đỏ |
+
+Hue đã đối chiếu với bảng màu hiện có: teal ~180° không đụng `--course-a` (~140°),
+`--gold` (~45°), `--order-need` (~250°), `--new-ring` (~195° nhưng sáng và chỉ dùng
+thoáng qua trên thẻ vừa bốc, không nằm cùng màn với facility).
+
+### 2. Placeholder khi chưa có ảnh — bắt buộc
+
+Đợt 1 chạy khi `public/art/Facility|Decor|Customer` còn trống. Thiếu ảnh thì card vẫn
+phải dựng đúng kích thước, **không** vỡ lưới, **không** hiện icon ảnh hỏng:
+
+- Nền `--panel-2`, viền theo token loại ở mục 1.
+- Giữa card: chữ cái đầu của `name` (in hoa, `--text-dim`, cỡ ~40% bề rộng card).
+- Nhãn tên dưới đáy vẫn hiện bình thường.
+
+Đây là trạng thái **chính thức**, không phải tạm bợ: người duyệt thả ảnh vào đúng đường
+dẫn ở mục 3 là card tự đổi sang ảnh, không cần sửa code.
+
+### 3. Quy ước tên file
+
+Theo đúng nếp `public/art/Card/` và `Food/` đang có (PascalCase, không dấu, không
+khoảng trắng):
+
+```text
+public/art/Facility/<PascalCaseId>.jpg     TableBasic.jpg · KitchenBasic.jpg · KitchenExtra.jpg
+public/art/Decor/<PascalCaseId>.jpg        PlantPot.jpg
+public/art/Customer/<PascalCaseId>.jpg     (đợt 2)
+```
+
+`id` trong catalogue (`15-` Rule 2) là `snake_case`; tên file là bản PascalCase của
+chính nó (`table_basic` → `TableBasic.jpg`). Đường dẫn đi qua `ART`
+(`import.meta.env.BASE_URL`) như mọi ảnh khác để build dưới `/<repo>/` không gãy.
+
+### 4. Lưới và nền quán
+
+- Ô trống: lưới mờ `#3a352c` (đúng `--sidewalk-line` đã dùng cho nền vỉa hè), độ dày
+  1px, không kẻ đậm — lưới là chỉ dẫn, không phải hoa văn.
+- Nền quán: dùng lại nền trang hiện có (`--bg-page` + `--bg-bulb-glow`), **không** vẽ
+  sàn/tường riêng ở đợt 1. Quán "có không khí" là việc của ảnh card, không phải của nền.
+- Card điều hướng (`.nav-card`): viền `--panel-border`, không dùng `--gold` — `--gold`
+  giữ đúng một nghĩa "bạn có thể hành động để ra điểm" trong ván (mục màu ở trên), nên
+  ở màn quán nó chỉ dành cho số gold và cho ô thả hợp lệ lúc kéo đồ.
+
+### 5. Chuyển động của card khách — ref Stacklands (chốt 2026-09-20)
+
+Khách **di chuyển thật trên lưới**, không fade-in tại chỗ: card nhảy từng bước ô một
+theo kiểu *Stacklands* — mỗi bước là một cú nhún ngắn (card hơi nghiêng + nhấc lên rồi
+đáp xuống ô kế tiếp), không trượt mượt, không xoay vòng. Đây là ngôn ngữ chuyển động
+**riêng của màn quán**; bàn chơi giữ nguyên cách thẻ bay theo đường cong như cũ.
+
+Số liệu nhịp nhảy (thời gian mỗi bước, độ cao nhún, độ nghiêng) thuộc về
+`16-customers-idle.md` + `design/ui/restaurant.md` ở đợt 2 — mục này chỉ chốt **ref và
+tính chất**: rời rạc theo ô, có trọng lượng, hơi ngộ nghĩnh, không "bay".
+
+### 6. Câu hỏi mở cho người duyệt
+
+1. Ba hex ở mục 1 là **đề xuất của artist trên bàn giấy**, chưa đặt cạnh ảnh thật. Khi
+   người duyệt thả loạt ảnh đầu tiên vào, cần một vòng `/art-spec` để chỉnh lại độ bão
+   hoà cho khớp với ảnh. *(Người duyệt đã đồng ý cách làm này, 2026-09-20.)*
+2. ~~Card facility có nên hiện footprint ở góc card trong shop không?~~ **Đã chốt
+   2026-09-20: có** — chữ nhỏ `--text-dim` dạng "2×2", để biết món ăn mấy ô trước khi mua.

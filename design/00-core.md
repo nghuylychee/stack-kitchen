@@ -104,7 +104,10 @@ Layout ghế 2-3-4 người, bố cục tay bài và animation: `design/ui/table
 
 ## Not doing
 
-- Không shop, gold, level, khách hàng, bàn craft tự do, pack (của 006). Chỉ giữ thao tác stack & cook để reveal.
+- ~~Không shop, gold, level, khách hàng~~ — đổi 2026-09-20: **ngoài ván bài** có một lớp meta,
+  quán ăn của người chơi (shop, gold, level, khách), thay cho main menu → `12-restaurant-meta.md`.
+  Lớp này **không đụng luật ván**: không đổi thẻ, không đổi bot, không ai trong phòng online thấy
+  nó (`12-` Rule 6). Trong ván vẫn không có shop/gold/bàn craft tự do/pack của 006.
 - ~~Không multiplayer online~~ — đổi 2026-09-16: có phòng online PvP, xem `06-online-room.md`. Vẫn không có nhiều người thật chung 1 máy.
 - Không thẻ tool/kỹ thuật, không thẻ đặc biệt/joker.
 - Không ăn "chi/pung" kiểu mạt chược thật — chỉ tố khi ráp ra **món hoàn chỉnh**.
