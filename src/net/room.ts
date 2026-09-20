@@ -4,7 +4,7 @@ import Peer, { type DataConnection } from 'peerjs';
 import { Match, type SeatConfig } from '../core/match';
 import type { HostEvent, Intent } from '../core/types';
 
-const PREFIX = 'stack-kitchen-v1-';
+const PREFIX = 'stack-kitchen-v4-';   // v4: players[].orderDone/orderSize (09); v3: draw.refill (08); v2: Menu & Order (07)
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';     // no 0/O/1/I
 const PING_MS = 2000, HOST_SILENCE_MS = 9000, CLIENT_SILENCE_MS = 7000;
 

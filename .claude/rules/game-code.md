@@ -13,7 +13,8 @@ under `/<repo>/`. New runtime dependencies need the user's OK.
 
 | Path | Owns | May import |
 |---|---|---|
-| `src/core/data.ts` | constants, cards, recipes — each number cites its doc | nothing |
+| `src/core/config.ts` | user-tunable numbers (hand, Menu/Order, deck, points, online timers) — Vietnamese comments | nothing |
+| `src/core/data.ts` | constants, cards, recipes — each number cites its doc; re-exports `config.ts` | `config` |
 | `src/core/rules.ts` | pure rule helpers | `data` |
 | `src/core/types.ts` | `View`, `HostEvent`, `Intent` — the wire protocol | `data`, `rules` |
 | `src/core/match.ts` | `Match`: rules, turn flow, claims, timers, bots, pacing | `core/*`, `ai/*` |

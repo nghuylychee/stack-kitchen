@@ -40,4 +40,39 @@ viewer, not fixed per player. A human seat played by a bot shows a small `bot` t
 in its name plate. There are now Home and Lobby screens (`#home`, `#lobby`) with no
 ui spec yet.
 
-See also [[feedback_ui_animation_numbers_guess]].
+**Menu & Orders (2026-09-19, `design/07-menu-orders.md`):** replaces the old
+"collect all 3 courses" win condition with a public per-match Menu (`MENU_SIZE`
+6/8/10 for 2/3/4 players) + a private per-seat Order (`ORDER_SIZE` 3/4/5 for
+2/3/4 players — both scale with player count, GUESS). `design/ui/menu-orders.md`
+went DRAFT → **AGREED** 2026-09-19 once the human answered its open questions;
+at that point its "Ảnh hưởng tới ui/table.md" list was folded directly into
+`design/ui/table.md` (which dropped `BUILT` → `AGREED`, new "Tuning pass (6)")
+— this is the second half of the pattern in
+[[feedback_extend_built_ui_spec_separately]]: companion file while pending
+approval, merge into the BUILT file once approved. `table.md` needs a human
+playtest + `/build` pass again before it can go back to `BUILT`.
+
+Adds `#menu-rail` (new zone, full-width strip under `#hud`, shrinks
+`#table-surface` by 64px) and `#my-order` (N rows inside `#my-panel`,
+replaces the old `#my-h2` A/M/D course-badge row — removed from opponent
+`.seat-head` pods too, since those badges implied the old win condition).
+`#recipeModal`/`#btnRecipes` repurposed ("Recipes" → "Menu", 20 dishes → just
+the match's N dishes) rather than adding a new button — keep this
+repurpose-not-add instinct for future menu-related UI work here.
+
+Two more decisions worth remembering for next time this area is touched:
+- Since Order no longer has to cover A/M/D and orders may overlap, `.order-row`
+  carries no course/goal badge — course colour is identity-only now, not a
+  progress signal, everywhere in this feature.
+- Two *separate*, deliberately non-conflicting signals for "what do I need to
+  cook": per-row ingredient chips inside `#my-order` (boolean have/missing,
+  no counts — a recipe never needs 2 of the same ingredient type) AND a small
+  static violet `--order-need` corner badge (artist-owned token/SVG, `art.md`
+  §3) on the player's own hand cards in `.hand-fan`. Keep both when extending
+  this feature rather than picking one.
+- `ORDER_SIZE` scaling forced `.order-row` height to shrink with N (40/34/28px
+  at 1280, 36/30/26px at 1024 for N=3/4/5) rather than growing the fixed
+  `.seat[bottom]` dock — the human's call was "dock height stays put, let
+  `#my-foods` scroll earlier" even under the new variable-N case.
+
+See also [[feedback_ui_animation_numbers_guess]], [[feedback_extend_built_ui_spec_separately]].

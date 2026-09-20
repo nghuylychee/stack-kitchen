@@ -1,6 +1,6 @@
 # 03 — Play & Claim (tố)
 
-**Status:** BUILT (2026-09-16 (5))
+**Status:** BUILT (2026-09-19, backlog #9 — Edge case kết thúc theo Order, `07-`)
 **Attaches to:** bước 3 (Play) trong lượt của `00-core.md`
 
 ## Overview
@@ -77,7 +77,7 @@ nhảy sang người ngồi sau họ.
 ## Edge cases
 
 - Người thật vừa đủ điều kiện tố vừa là người có món điểm thấp hơn AI → vẫn được hỏi; nếu tố mà thua ưu tiên thì không mất gì, thẻ về người thắng.
-- Tố xong đạt đủ 3 loại → ván kết thúc ngay, `W` không Play.
+- Tố xong mà xong Order (`07-menu-orders.md` Kết thúc A') → ván kết thúc ngay, `W` không Play.
 - Chuỗi tố liên tiếp (W đánh ra, người khác tố tiếp) là hợp lệ, không giới hạn.
 
 ## Depends on

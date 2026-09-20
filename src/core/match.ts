@@ -2,11 +2,11 @@
 // timings the client animates with, and talks to seats only through send()/intent().
 // Used as-is for both modes: offline = one local human seat, online = PeerJS host.
 import {
-  AI_STEP_MS, CLAIM_WINDOW_MS, COOK_MS, COPIES_PER_TYPE, COURSE_NAME, FIRST_FULL_BONUS, HAND_START, PLAY_REVEAL_MS,
-  T, TURN_LIMIT_MS, TYPE_ORDER, label, recipeByDish, type CardType, type Recipe,
+  AI_STEP_MS, CLAIM_WINDOW_MS, COOK_MS, COPIES_PER_TYPE_MENU, COURSE_NAME, HAND_SIZE, introMs,
+  MENU_SIZE, ORDER_BONUS, ORDER_SIZE, PLAY_REVEAL_MS, RECIPES, REFILL_STAGGER_MS, configErrors, T, TURN_LIMIT_MS, TYPE_ORDER, label, type CardType, type Recipe,
 } from './data';
-import { claimable, courseCount, removeOne, shuffle, sortHand, type FoodLike } from './rules';
-import { aiChooseDiscard, aiChooseReveal, aiShouldReveal } from '../ai/bot';
+import { claimable, orderDone, removeOne, shuffle, sortHand, type FoodLike } from './rules';
+import { aiChooseClaim, aiChooseDiscard, aiChooseReveal, type BotSelf, type BotTable, type PubEv } from '../ai/bot';
 import type { HostEvent, Intent, View } from './types';
 
 export interface SeatConfig { name: string; human: boolean; connected: boolean }
@@ -14,6 +14,7 @@ export interface SeatConfig { name: string; human: boolean; connected: boolean }
 interface P {
   idx: number; name: string; human: boolean; connected: boolean;
   hand: CardType[]; foods: FoodLike[]; score: number; bonus: number;
+  order: string[];                                                    // 07 Rule 5 — secret, host-only until the end
   cook: { r: Recipe; start: number; id: number } | null;
   ready: Recipe | null; autoCollect: boolean;
   prompt: { phase: 'draw' | 'play' | 'claim'; deadline: number | null; claim?: { card: CardType; by: string; opts: string[] } } | null;
@@ -29,6 +30,8 @@ class Abort extends Error {}
 export class Match {
   players: P[];
   pool: CardType[] = [];
+  menu: Recipe[] = [];                                                // 07 Rule 1 — public
+  private pub: PubEv[] = [];                                          // public event history bots read (05 Rule 8)
   discard: CardType[] = [];
   current = 0; turn = 0; claims = 0; ended = false;
   lastPlayed: CardType | null = null; lastBy: string | null = null;
@@ -38,23 +41,36 @@ export class Match {
 
   constructor(seats: SeatConfig[], private online: boolean, private send: (seat: number, ev: HostEvent) => void) {
     this.players = seats.map((s, idx) => ({ idx, name: s.name, human: s.human, connected: s.human && s.connected,
-      hand: [], foods: [], score: 0, bonus: 0, cook: null, ready: null, autoCollect: false, prompt: null }));
+      hand: [], foods: [], score: 0, bonus: 0, order: [], cook: null, ready: null, autoCollect: false, prompt: null }));
   }
 
   // ------------------------------------------------------------------ lifecycle
   start() {
     this.stop();
+    const bad = configErrors();
+    if (bad.length) {                                                 // config.ts edited into an impossible game — don't deal
+      console.error('Stack Kitchen: invalid src/core/config.ts —\n  ' + bad.join('\n  '));
+      this.emit(() => ({ t: 'toast', msg: 'Invalid config — see console' }));
+      return;
+    }
     const tok = this.token;
     const n = this.players.length;
+    this.menu = shuffle(RECIPES.slice()).slice(0, MENU_SIZE[n]);        // 07 Rule 1
+    const types = TYPE_ORDER.filter(t => this.menu.some(r => r.types.includes(t)));
     const deck: CardType[] = [];
-    TYPE_ORDER.forEach(t => { for (let i = 0; i < COPIES_PER_TYPE; i++) deck.push(t); });
+    types.forEach(t => { for (let i = 0; i < COPIES_PER_TYPE_MENU; i++) deck.push(t); });   // 07 Rule 2-3
     shuffle(deck);
-    for (const p of this.players) Object.assign(p, { hand: [], foods: [], score: 0, bonus: 0, cook: null, ready: null, autoCollect: false, prompt: null });
-    for (let k = 0; k < HAND_START; k++) for (const p of this.players) p.hand.push(deck.pop()!);
+    for (const p of this.players) Object.assign(p, { hand: [], foods: [], score: 0, bonus: 0, cook: null, ready: null, autoCollect: false, prompt: null,
+      order: shuffle(this.menu.slice()).slice(0, ORDER_SIZE[n]).map(r => r.dish) });   // 07 Rule 5-6: independent, may overlap
+    for (let k = 0; k < HAND_SIZE; k++) for (const p of this.players) p.hand.push(deck.pop()!);
     this.players.forEach(p => sortHand(p.hand));
+    this.pub = [];
     Object.assign(this, { pool: deck, discard: [], current: Math.floor(Math.random() * n), turn: 0, claims: 0, ended: false, lastPlayed: null, lastBy: null });
     this.emit(() => ({ t: 'start' }));
-    this.log(() => `New game: ${n} players, ${HAND_START} cards each, pool ${deck.length}. ${this.players[this.current].name} starts.`);
+    this.log(() => `New game: ${n} players, ${HAND_SIZE} cards each, pool ${deck.length}. ${this.players[this.current].name} starts.`);
+    this.log(() => `Menu: ${this.menu.map(r => r.dish).join(', ')}.`, '',          // 07 "Theo dõi khi build": real pool size per game
+      `${types.length} ingredient types × ${COPIES_PER_TYPE_MENU} = ${types.length * COPIES_PER_TYPE_MENU} cards, ${deck.length} left after the deal`);
+    this.log(s => `Your order: ${this.players[s].order.join(', ')}.`, 'reveal');
     this.run(tok).catch(e => { if (!(e instanceof Abort)) console.error(e); });
   }
 
@@ -107,8 +123,10 @@ export class Match {
     return {
       you: seat,
       players: this.players.map(p => ({ idx: p.idx, name: p.name, human: p.human, connected: p.connected, handCount: p.hand.length,
-        foods: p.foods.slice(), score: p.score, bonus: p.bonus, hand: this.ended ? p.hand.slice() : undefined })),
-      hand: me.hand.slice(), pool: this.pool.length, discard: this.discard.slice(), lastPlayed: this.lastPlayed, lastBy: this.lastBy,
+        foods: p.foods.slice(), score: p.score, bonus: p.bonus, hand: this.ended ? p.hand.slice() : undefined,
+        order: this.ended ? p.order.slice() : undefined,
+        orderDone: p.order.filter(d => orderDone(p, d)).length, orderSize: p.order.length })),   // 09 Rule 2 — count only
+      hand: me.hand.slice(), menu: this.menu.map(r => r.dish), order: me.order.slice(), pool: this.pool.length, discard: this.discard.slice(), lastPlayed: this.lastPlayed, lastBy: this.lastBy,
       current: this.current, turn: this.turn, claims: this.claims, ended: this.ended, online: this.online,
     };
   }
@@ -124,10 +142,16 @@ export class Match {
   // a rejected intent means the client guessed wrong — toast, then resync that seat from truth
   private reject(seat: number, msg: string) { this.send(seat, { t: 'reject', msg, view: this.view(seat) }); this.syncSeat(seat); }
 
+  // what a bot may know: its own hand + Order, and public table state (05 Overview — never other hands/Orders/pool)
+  private botSelf = (p: P): BotSelf => ({ idx: p.idx, hand: p.hand, foods: p.foods, order: p.order });
+  private botTable(): BotTable {
+    return { menu: this.menu, discard: this.discard, lastPlayed: this.lastPlayed, players: this.players.map(p => ({ foods: p.foods })), pub: this.pub };
+  }
+
   private nm = (p: P, seat: number) => p.idx === seat ? 'You' : p.name;
   private vb = (p: P, seat: number, verb: string, third?: string) => p.idx === seat ? verb : (third || verb + 's');
-  private log(make: (seat: number) => string, cls = '', why = '') {
-    for (const p of this.players) if (this.controlled(p)) this.send(p.idx, { t: 'log', msg: make(p.idx), cls, why });
+  private log(make: (seat: number) => string, cls = '', why = '', only?: (seat: number) => boolean) {
+    for (const p of this.players) if (this.controlled(p) && (!only || only(p.idx))) this.send(p.idx, { t: 'log', msg: make(p.idx), cls, why });
   }
 
   // ------------------------------------------------------------------ timing
@@ -156,7 +180,9 @@ export class Match {
   // ------------------------------------------------------------------ game loop
   private async run(tok: number) {
     const n = this.players.length;
-    await this.wait(200 + HAND_START * n * T.dealStagger + T.deal + 60);
+    await this.wait(introMs(this.menu.length, this.players[0].order.length) + T.menuGap);   // 10-match-intro.md
+    this.check(tok);
+    await this.wait(200 + HAND_SIZE * n * T.dealStagger + T.deal + 60);
     while (!this.ended) {
       this.check(tok);
       const p = this.players[this.current];
@@ -199,6 +225,7 @@ export class Match {
       const { card, why } = pick;
       removeOne(p.hand, card);
       this.lastPlayed = card; this.lastBy = p.name;
+      this.pub.push({ k: 'play', seat: p.idx, card });
       this.emit(() => ({ t: 'play', seat: p.idx, card }));
       this.log(s => `${this.nm(p, s)} ${this.vb(p, s, 'play')} ${label(card)}.`, '', why);
       await this.wait(T.play + PLAY_REVEAL_MS);
@@ -212,9 +239,24 @@ export class Match {
         this.current = (p.idx + 1) % this.players.length; return;
       }
       this.lastPlayed = null;                                         // 03 Rule 6-7
+      await this.refill(w, tok);                                      // 08 Rule 2 — claim winner just revealed
+      if (this.ended) return;
       p = w;
       this.current = w.idx;
     }
+  }
+
+  // 08 Rule 2-9 — right after a reveal, top up to HAND_SIZE + 1 (the player still owes one Play, which leaves
+  // exactly HAND_SIZE). Stops quietly when the pool runs dry (Kết thúc B stays at Draw).
+  private async refill(p: P, tok: number) {
+    let k = 0;
+    while (!this.ended && p.hand.length < HAND_SIZE + 1 && this.pool.length) {
+      const card = this.pool.pop()!;
+      p.hand.push(card); sortHand(p.hand); k++;
+      this.emit(s => ({ t: 'draw', seat: p.idx, card: s === p.idx ? card : null, refill: true }));
+      await this.wait(REFILL_STAGGER_MS); this.check(tok);
+    }
+    if (k) this.log(s => `${this.nm(p, s)} ${this.vb(p, s, 'refill')} +${k}.`);
   }
 
   // returns the card to play, or null when the hand is empty
@@ -235,33 +277,36 @@ export class Match {
         const r = await this.waitFor<CardType | 'recheck'>(p, left, m => this.handlePlayIntent(p, m));
         p.prompt = null;
         this.check(tok);
-        if (r === 'recheck') continue;
+        if (r === 'recheck') { await this.refill(p, tok); continue; }   // 08 Rule 2 — food just collected
         if (r === ENDED) return null;
         if (r === TIMEOUT || r === GONE) {
           if (r === TIMEOUT) this.log(s => `${this.nm(p, s)} timed out — bot plays this step.`, 'why');
           await this.settleCook(p, tok);
           if (this.ended) return null;
+          await this.refill(p, tok);                                  // 08 Rule 2 — no-op unless a dish was just collected
           break;                                                      // fall through to the bot path
         }
         return { card: r, why: '' };
       }
     }
     while (true) {                                                    // 05 Rule 2
-      const pick = aiChooseReveal(p, this, (r, why) => this.log(() => `${p.name} holds ${r.dish}`, 'why', why));
+      const pick = aiChooseReveal(this.botSelf(p), this.botTable(), (r, why) => this.log(() => `${p.name} holds ${r.dish}`, 'why', why));
       if (!pick) break;
       await this.wait(AI_STEP_MS); this.check(tok);
       await this.botCook(p, pick.r, pick.why, false, tok);
       if (this.ended) return null;
+      await this.refill(p, tok);                                      // 08 Rule 2 — may enable another dish
     }
     if (p.hand.length === 0) return null;
     await this.wait(AI_STEP_MS); this.check(tok);
-    return aiChooseDiscard(p, this);
+    return aiChooseDiscard(this.botSelf(p), this.botTable());
   }
 
   private handlePlayIntent(p: P, m: Intent): Res<CardType | 'recheck'> {
     if (m.t === 'cook') {                                             // 02 Rule 11
-      const r = recipeByDish(m.dish);
-      if (!r || !r.types.every(t => p.hand.includes(t))) return { err: 'You do not have those cards' };
+      const r = this.menu.find(x => x.dish === m.dish);              // 07 Rule 4
+      if (!r) return { err: 'Not on the menu' };
+      if (!r.types.every(t => p.hand.includes(t))) return { err: 'You do not have those cards' };
       if (p.cook || p.ready) return { err: 'Collect your food first' };
       this.startCook(p, r);
       return { keep: true };
@@ -312,13 +357,18 @@ export class Match {
     r.types.forEach(t => removeOne(p.hand, t));
     p.foods.push({ dish: r.dish, c: r.c, pts: r.pts, img: r.img });
     p.score += r.pts;
+    this.pub.push({ k: 'reveal', seat: p.idx, dish: r.dish, viaClaim });
     this.emit(() => ({ t: 'reveal', seat: p.idx, dish: r.dish, viaClaim }));
     this.log(s => `${this.nm(p, s)} ${viaClaim ? this.vb(p, s, 'claim') + ' & reveal' + (p.idx === s ? '' : 's') : this.vb(p, s, 'reveal')} ${r.dish} (${COURSE_NAME[r.c]}) +${r.pts}`,
       viaClaim ? 'claim' : 'reveal', why);
-    if (courseCount(p) === 3 && !this.ended) {                        // 04 Rule 3
-      p.bonus = FIRST_FULL_BONUS; p.score += FIRST_FULL_BONUS;
-      this.log(s => `${this.nm(p, s)} ${this.vb(p, s, 'have', 'has')} all 3 courses! +${FIRST_FULL_BONUS}`, 'end');
-      this.endGame('full', p);
+    if (p.order.includes(r.dish)) {                                   // own seat only — never hints at others' orders
+      const done = p.order.filter(d => orderDone(p, d)).length;
+      this.log(s => `Order ${done}/${p.order.length} done.`, 'reveal', '', s => s === p.idx);
+    }
+    if (p.order.every(d => orderDone(p, d)) && !this.ended) {        // 07 Rule 10 — Kết thúc A'
+      p.bonus = ORDER_BONUS; p.score += ORDER_BONUS;
+      this.log(s => `${this.nm(p, s)} ${this.vb(p, s, 'finish', 'finishes')} ${p.idx === s ? 'your' : 'their'} order! +${ORDER_BONUS}`, 'end');
+      this.endGame('order', p);
     }
   }
 
@@ -329,16 +379,15 @@ export class Match {
     for (let k = 1; k < n; k++) others.push(this.players[(discarder.idx + k) % n]);
     const bids: { q: P; r: Recipe; why: string; start: number; human: boolean }[] = [];
     const humans: { q: P; opts: Recipe[] }[] = [];
-    const botBid = (q: P, opts: Recipe[]) => {
-      const r = opts[0];
-      const d = aiShouldReveal(q, this, r, q.hand.concat([card]));
-      if (d.reveal) bids.push({ q, r, why: d.why, start: 0, human: false });
-      else this.log(() => `${q.name} passes`, 'why', `could claim ${r.dish} but ${d.why}`);
+    const botBid = (q: P) => {                                       // 05 Rule 3 + 11
+      const { pick, why } = aiChooseClaim(this.botSelf(q), this.botTable(), card);
+      if (pick) bids.push({ q, r: pick.r, why: pick.why, start: 0, human: false });
+      else { this.pub.push({ k: 'pass', seat: q.idx, card }); this.log(() => `${q.name} passes`, 'why', why); }
     };
     for (const q of others) {
-      const opts = claimable(q.hand, card).sort((a, b) => b.pts - a.pts);
+      const opts = claimable(q.hand, card, this.menu).sort((a, b) => b.pts - a.pts);
       if (!opts.length) continue;
-      if (this.controlled(q)) humans.push({ q, opts }); else botBid(q, opts);
+      if (this.controlled(q)) humans.push({ q, opts }); else botBid(q);
     }
     if (humans.length) {
       const ms = this.online ? CLAIM_WINDOW_MS : null;
@@ -357,12 +406,14 @@ export class Match {
         });
       }));
       this.check(tok);
-      humans.forEach(({ q, opts }, i) => {
+      humans.forEach(({ q }, i) => {
         q.prompt = null;
         const res = results[i];
-        if (res === GONE) botBid(q, opts);
-        else if (res === 'pass' || res === TIMEOUT || res === ENDED) this.log(s => `${this.nm(q, s)} ${this.vb(q, s, 'pass', 'passes')} on ${label(card)}.`);
-        else bids.push({ q, r: res.r, why: '', start: res.start, human: true });
+        if (res === GONE) botBid(q);
+        else if (res === 'pass' || res === TIMEOUT || res === ENDED) {
+          this.pub.push({ k: 'pass', seat: q.idx, card });
+          this.log(s => `${this.nm(q, s)} ${this.vb(q, s, 'pass', 'passes')} on ${label(card)}.`);
+        } else bids.push({ q, r: res.r, why: '', start: res.start, human: true });
       });
       this.emit(() => ({ t: 'claimClose' }), q => humans.some(h => h.q === q));
     }
@@ -390,10 +441,10 @@ export class Match {
     return w;
   }
 
-  private endGame(reason: 'full' | 'pool', finisher: P | null) {
+  private endGame(reason: 'order' | 'pool', finisher: P | null) {
     if (this.ended) return;
     this.ended = true;
-    this.log(s => reason === 'full' ? `Game over — ${this.nm(finisher!, s)} completed 3 courses.` : 'Game over — pool empty.', 'end');
+    this.log(s => reason === 'order' ? `Game over — ${this.nm(finisher!, s)} finished ${finisher!.idx === s ? 'your' : 'their'} order first.` : 'Game over — pool empty.', 'end');
     this.emit(() => ({ t: 'end', reason, finisher: finisher ? finisher.idx : null }));
     this.stop();
   }

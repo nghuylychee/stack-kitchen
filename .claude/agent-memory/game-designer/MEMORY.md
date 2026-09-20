@@ -1,0 +1,3 @@
+- [Menu & Orders pivot (2026-09-19)](project_menu_orders_pivot.md) — 07-menu-orders.md is AGREED + applied to 00/01/04/05/06; numbers/bot model decided, don't re-open
+- [Doc-first, multi-role approval workflow](feedback_doc_first_multi_role.md) — user wants GD+Art+UI docs drafted before any backlog ticket, on big pivots
+- [User is sole approver / non-coder](user_role_sole_approver.md) — reviews docs in Vietnamese, decides GUESS numbers, never writes code

@@ -1,6 +1,6 @@
 # 06 — Online Room (PvP qua mạng)
 
-**Status:** BUILT (2026-09-16, backlog #8 — các câu hỏi mở bên dưới vẫn chờ người duyệt)
+**Status:** BUILT (2026-09-19, backlog #9 — Rule 26–27 redaction Order; các câu hỏi mở khác vẫn chờ người duyệt)
 **Attaches to:** thêm 1 chế độ chơi bên cạnh MVP hiện tại (`00-core.md` +
 `05-ai-player.md`), gắn ở màn hình mở đầu (trước khi vào `ui/table.md`). Luật
 bài — bốc, reveal, đánh, tố, điểm, kết thúc ván — **không đổi gì**, chỉ thêm
@@ -121,14 +121,23 @@ thẻ trong pool.
 
 ### End of game & host
 
-23. Ván kết thúc (đủ 3 loại hoặc pool cạn, `04-`) → mọi client thấy màn kết
-    thúc giống nhau.
+23. Ván kết thúc (xong Order hoặc pool cạn, `07-menu-orders.md` Rule 10–11) →
+    mọi client thấy màn kết thúc giống nhau.
 24. Chỉ host thấy nút **"Play again"** — bấm vào bắt đầu ván mới **cùng phòng,
     cùng ghế**; ghế nào đang là người thật đã rời (offline) thì ván mới coi
     ghế đó là bot cho tới khi họ rejoin. Client khác thấy "Waiting for host".
 25. Host rời phòng (mất kết nối hoặc đóng tab) → mọi client thấy **"Host left
     — room closed"** kèm nút về Home. Đây là hạn chế đã biết và chấp nhận của
     kiến trúc P2P không có server trung gian — không có cơ chế bầu host mới.
+
+### Order (thêm từ `07-menu-orders.md`)
+
+26. `View` gửi cho mỗi ghế chỉ chứa Order của **ghế đó**; Order của ghế khác
+    không nằm trong payload mạng trong suốt ván — cùng nguyên tắc redact tay
+    bài/pool ở Rules trên, áp dụng thêm cho Order (`07-` Rule 17).
+27. Payload màn kết thúc ván (Rule 23) gửi kèm Order đầy đủ **mọi ghế**, đánh
+    dấu món đã xong/chưa xong (`07-` Rule 13) — trả lời câu hỏi mở #1 cũ cho
+    riêng Order: bí mật trong ván, công khai lúc kết thúc, giống món đã reveal.
 
 ## Numbers
 
@@ -162,6 +171,8 @@ thẻ trong pool.
   — toàn bộ luật bài, không đổi.
 - `05-ai-player.md` — bot chơi hộ ghế offline/hết giờ, dùng đúng luật chấm
   điểm thẻ (Rule 4) khi tự đánh hộ.
+- `07-menu-orders.md` — Order redact theo ghế trong ván, công khai lúc kết
+  thúc (Rule 26–27 doc này).
 - `ui/table.md` — layout ghế theo chiều kim đồng hồ, chỉ đổi gốc `bottom` theo
   từng client.
 
@@ -179,6 +190,8 @@ thẻ trong pool.
   phòng, cùng ghế; client khác chỉ thấy "Waiting for host" cho tới lúc đó.
 - Join vào phòng đã đủ người thật ở mọi ghế → bị từ chối với thông báo "Room
   full", không vào được với vai trò khán giả.
+- Order riêng chỉ hiện đúng ghế của mình lúc đang chơi (kiểm bằng 2 tab); mọi
+  ghế thấy đủ Order của nhau ở màn kết thúc (`07-`).
 
 ## Câu hỏi mở
 

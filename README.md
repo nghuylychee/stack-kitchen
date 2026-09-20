@@ -2,16 +2,16 @@
 
 | Field | Value |
 |---|---|
-| **Status** | LIVE |
+| **Status** | BUILDING |
 | **Viewport** | responsive, desktop-first |
-| **Last playtest** | 2026-09-16 (4) — KEEP GOING (deploy để bạn bè test chung) |
+| **Last playtest** | 2026-09-19 (3) — KEEP GOING (pointer kéo-thả đôi lúc không ăn, auto-draw sau refill, dời khu món đã nấu + info panel, bỏ Restart/Menu/Log) |
 | **Live build** | https://nghuylychee.github.io/stack-kitchen/ |
 
 Status is one of: `BUILDING` · `PLAYTEST` · `LIVE` · `PAUSED`.
 
 Card game 2–4 người kiểu mạt chược: bốc, giữ, đánh và tố thẻ nguyên liệu để ráp
-món Việt. Ai đủ Appetizer + Main + Dessert trước thì kết thúc ván, điểm cao nhất
-thắng.
+món Việt. Mỗi ván có 1 Menu công khai, mỗi người có 1 Order bí mật (vài món trong
+Menu). Ai nấu xong hết Order trước thì kết thúc ván (+10); điểm cao nhất thắng.
 
 Tốt nghiệp từ slot `007-kitchen-mahjong` của NGH-AI-GAME-STUDIO — xem
 `ADR-004-graduate-007-standalone-repo.md` bên repo studio.

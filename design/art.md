@@ -495,3 +495,222 @@ sau này muốn nâng cấp bằng ảnh nền thật thay vì CSS gradient:
   no people, wide empty space in the center for UI overlay."
 - *(Khay men Bếp đã bỏ khỏi prompt list — sửa 2026-09-16 (2), zone Bếp không
   còn tồn tại; xem "Chồng nấu trong tay" cho ngôn ngữ mới.)*
+
+## Menu & Order — bổ sung cho `07-menu-orders.md` (Status: BUILT — backlog #10)
+
+**Ngày:** 2026-09-19, theo playtest 2026-09-19 ("...cần cả GD, Art, UI làm doc
+trước để tôi duyệt sau đó lên ticket" → `playtest.md`, Next status: KEEP GOING).
+Đối tượng: `design/07-menu-orders.md` (Status: DRAFT). Mục này **chỉ thêm**,
+không sửa gì ở các mục phía trên.
+
+**Sửa 2026-09-19 (2)** (review cùng người dùng, đối chiếu `design/ui/menu-orders.md`
+đã viết xong — không còn 2 file mù thông tin nhau): đổi trạng thái "đã xong"
+của Order sang viền vàng nhạt + glow (không còn dim+gạch ngang), bỏ hẳn hình
+dạng "ticket giấy nghiêng + que xiên" (Order giờ là `.order-row` trong
+`#my-panel`, không phải 1 vật thể rời trên bàn), khớp lại theo `#menu-rail`/
+`.menu-item` thật (rail ngang 44×44, không phải "Menu board" tốc kê trước
+đó), cập nhật `ORDER_SIZE` theo số người, sửa lỗi đếm `public/art/Card` (27
+ảnh, không phải 26), trả lời trọn bộ asset ask của UI. Chuyển
+**Status: AGREED** — không còn câu hỏi mở chặn `/build` (trừ 2 câu nhỏ giữ
+lại ở cuối mục, không chặn).
+
+**Phối hợp:** `design/ui/menu-orders.md` (đã viết xong) sở hữu layout/zone/
+kích thước px thật của `#menu-rail`, `.menu-item`, `#my-order`, `.order-row`,
+`.order-chip`, popover, cột Order ở `#endModal` — mục này chỉ sở hữu màu/
+chất liệu/token, dùng đúng số đã chốt ở file đó (không còn kích thước GUESS
+riêng của Art).
+
+### 1. Menu item (`#menu-rail` / `.menu-item`, `07-` Rule 1, 14 — công khai, đứng nguyên suốt ván)
+
+**Sửa:** bản trước đề xuất 1 "Menu board" dạng thẻ đứng ~52×80px xếp lưới —
+`ui/menu-orders.md` (đã chốt) chọn khác: 1 dải ngang `#menu-rail` full-width
+ngay dưới `#hud`, mỗi món là `.menu-item` 44×44 (đúng sàn tap target, không
+lớn hơn). Viết lại theo đúng hình dạng thật này; ý gốc "Menu là danh sách
+tham khảo tĩnh, nhẹ hơn hẳn food card" giữ nguyên.
+
+- **Ảnh:** `Art/Food/*` (có sẵn, 20/20 món), `object-fit: cover`, 40×40
+  trong ô 44×44 (lề 2px). Không cần crop mới — 40×40 lớn hơn kích thước ảnh
+  nhỏ nhất đã duyệt trong code (`Food pill` 28×28), nên chắc chắn đọc được.
+- **Huy hiệu loại (course badge), góc trên-trái ảnh:** ở ~9–10px khả dụng,
+  chữ A/M/D **không đọc được** (<8px, dưới ngưỡng silhouette Readability).
+  **Chốt:** badge chỉ còn 1 chấm tròn màu course, bỏ chữ cái — đây là ngoại
+  lệ với luật "course color luôn kèm chữ cái," chấp nhận có kiểm soát vì (1)
+  thông tin tham khảo tĩnh, không phải tín hiệu cần đọc tức thời để hành
+  động, (2) bản đầy đủ (chip + chữ cái) luôn cách đúng 1 hover/tap ở popover
+  công thức (mục 2b). Nếu người duyệt thấy chấm màu đơn độc vẫn gây khó chịu
+  khi test thật, thay thế duy nhất khả thi là bỏ hẳn course badge khỏi
+  `.menu-item`, dồn 100% vào popover (xem Câu hỏi mở #2 cuối mục).
+- **Số điểm góc dưới-phải:** chip nhỏ, nền tối `rgba(20,16,10,.7)`, chữ
+  `--text` — **không** `--gold` (số tham khảo, chưa phải "có thể hành động
+  ngay", giữ nguyên lý do gốc của quyết định này).
+- **Popover công thức (hover/tap):** dùng chung 1 component với `.order-row`
+  — xem mục 2b bên dưới (trả lời asset ask "recipe popover styling" của UI).
+- **`#menu-rail` (khung dải):** nền `--panel`, viền dưới 1px `--panel-border`
+  — tái dùng đúng ngôn ngữ `#topbar`, không cần token mới.
+- Menu item **tĩnh suốt ván** — không có trạng thái "đã nấu"/"hết nguyên
+  liệu" ở MVP này (khớp lựa chọn "không báo hiệu" của `07-` Câu hỏi mở #8).
+
+### 2. Order rows (bí mật, `07-` Rule 5-8, 15-17 — trong `#my-order`)
+
+**Sửa:** bỏ hẳn hình dạng "giấy order xé mép + nghiêng -1.5deg + que xiên"
+của bản trước. Lý do: `ui/menu-orders.md` đặt Order thành `.order-row` — các
+hàng thẳng bên trong `#my-panel` (cùng khối với Tên/Điểm/Số bài/Món đã thu),
+không phải 1 vật thể rời đặt tự do trên `#table-surface`. Giấy nghiêng + mép
+xé là ngôn ngữ "vật thể vật lý đặt lên bàn", không khớp khi nó chỉ là 1 khối
+trong danh sách dọc hẹp (`clamp(190–220px)`) — nghiêng tĩnh còn tràn chữ ở
+cột hẹp đó (đúng lo ngại đã nêu ở Câu hỏi mở #5 bản trước, nay xác nhận: bỏ).
+
+**Quyết định chất liệu:** không giữ tint giấy kem (`--ing-bg`) làm nền riêng
+cho `.order-row` — 3 khối khác trong cùng `#my-panel` (Tên, Điểm, Số bài,
+Món đã thu) đều dùng nền `--panel` tối nhất quán; đổi riêng khối Order sang
+nền giấy sáng sẽ đọc như 1 lỗi bố cục hơn là "đây là Order của tôi." Tín hiệu
+"của riêng tôi" giờ đến từ **vị trí** (chỉ nằm trong `#my-panel` của chính
+người xem, không hiện ở pod đối thủ — đã là sự thật cấu trúc) và **nhãn "YOUR
+ORDER"**, không cần giả lập vật liệu giấy nữa. Que xiên trang trí bỏ hẳn khỏi
+asset list — không còn chỗ để đặt nó.
+
+- **Header:** "YOUR ORDER" nhỏ, `--text-dim`, căn trái.
+- **Phân cách khối:** đường kẻ mảnh `--panel-border` opacity `.4` phía trên
+  và dưới khối Order — tái dùng đúng convention "Panel info người chơi mở
+  rộng" đã có ở phần trên file này.
+- **Số hàng:** `ORDER_SIZE` theo số người — **3 (2 người) / 4 (3 người) / 5
+  (4 người)** (chốt mới, không còn cố định 3, không còn ràng buộc phủ đủ
+  A/M/D). `#my-order` cần cao đủ cho tối đa **5 hàng** (ván 4 người) — cùng 1
+  ngôn ngữ hàng, chỉ đổi số lượng lặp. Đây là input cho Câu hỏi mở #4 của
+  `ui/menu-orders.md` (chiều cao dock ở 1024×700) — Art không quyết layout,
+  chỉ nêu số hàng tối đa để `ui-designer`/`game-dev` tính lại nếu cần.
+- **`.order-row` (40px / 36px @1024, theo `ui/menu-orders.md`):**
+  - Dấu trạng thái đầu hàng: `○` chưa xong (`--text-dim`, ~10px) → `✓` đã
+    xong (cùng màu vàng nhạt với viền hàng, xem dưới).
+  - Tên món `--text`, điểm `+N` `--text-dim` — **không** `--gold` (điểm đã
+    ghi nhận lúc reveal ở hand-fan; hàng Order chỉ nhắc lại con số, không
+    phải nơi "sắp hành động").
+  - `.order-chip` (nguyên liệu công thức, 14×14 / 12×12 theo `ui/`):
+    thumbnail crop `Art/Card/*` — **tái dùng đúng crop 18×18** đã định ở mục
+    2b (chỉ co nhỏ qua CSS, không cắt ảnh mới). Ở 12–14px, chữ course A/M/D
+    **chắc chắn không đọc được** — nhưng `.order-chip` không cần mang nghĩa
+    course: nó chỉ trả lời "có-trong-tay hay chưa", không phải "loại gì".
+    Có-trong-tay: đủ màu + viền `--gold` 1px mảnh (tái dùng đúng ngữ nghĩa
+    "useful" của thẻ trong tay — chip này là 1 bản đọc thu nhỏ của chính
+    trạng thái đó, không phải nghĩa mới). Chưa-có: `opacity .45`, không viền.
+  - **Viền hàng — "chưa xong":** `1px --panel-border` (trung tính, giống mọi
+    viền chia nhóm khác trong panel — trả lời asset ask "unfinished
+    `.order-row` border colour").
+  - **Viền hàng — "đã xong" (chốt mới, thay dim+gạch ngang):** `1.5px`, màu
+    **vàng nhạt `rgba(242,193,78,.5)`** (50% alpha của `--gold`) + 1 glow
+    tĩnh rất nhẹ `box-shadow: 0 0 6px rgba(242,193,78,.25)`. Cố tình **yếu
+    hơn rõ rệt** cả 2 mốc dùng `--gold` đặc 100%: (a) chip điểm `+N` trên
+    food card, và (b) khoảnh khắc hoàn thành cả Order (viền `--gold` 3px 1
+    lần + Shine, xem dưới) — 3 cấp vàng đọc được thứ bậc "1 món đã xong (50%
+    alpha, tĩnh) < đang có thể hành động (100%, nhịp, ở nơi khác trong tay/
+    Cook) < vừa ăn điểm lớn toàn Order (100%, viền dày, 1 lần)." Dấu `✓` đầu
+    hàng dùng cùng `rgba(242,193,78,.5)`.
+  - **Glow 1 nhịp lúc vừa chuyển xong** (`ui/` Interactions, 400ms): 1 lần
+    `box-shadow 0 0 0 4px rgba(242,193,78,.35)` scale-out + fade, đúng
+    khung thời gian UI đã định, sau đó hạ về viền tĩnh 50% alpha ở trên —
+    không lặp lại.
+  - **Không dùng** `filter: brightness(.7) saturate(.6)` (dim) hay
+    `text-decoration: line-through` cho trạng thái này nữa — 2 công thức đó
+    giữ nguyên vai trò cũ ở nơi khác trong file (locked-while-cooking).
+- **Khoảnh khắc hoàn thành toàn bộ Order (`07-` Rule 10, `ORDER_BONUS`):**
+  không đổi ý nghĩa, chỉ đổi nơi áp — vì không còn 1 "ticket" rời, hiệu ứng
+  áp lên **khối `#my-order`** (không phải từng `.order-row`): viền `--gold`
+  3px 1 lần (không lặp) quanh khối + 1 lượt "Shine quét" (đã định nghĩa ở
+  Card spec) chạy qua toàn khối.
+
+#### 2b. Popover công thức (dùng chung `.menu-item` + `.order-row`, trả lời asset ask của UI)
+
+- Khung: nền `--panel`, viền 1px `--panel-border`, bo góc 8px, shadow
+  `0 6px 10px rgba(0,0,0,.35)` (tái dùng đúng shadow hover thẻ đã có).
+- Dòng tiêu đề: tên món `--text` đậm + chip course tròn Ø16px kèm chữ A/M/D
+  (đủ chỗ ở popover — không bị giới hạn kích thước như `.menu-item`/
+  `.order-chip`) + điểm `+N` `--text`.
+- Danh sách nguyên liệu: mỗi loại 1 thumbnail **18×18** crop từ `Art/Card/*`
+  (ảnh có sẵn, không cắt mới) xếp ngang, không viền phụ mặc định; **đang có
+  trong tay** → viền `--gold` 1px mảnh (tái dùng đúng chữ legend "gold = in
+  your hand now" đã có ở Recipes modal); **chưa có** → `opacity .5`, không
+  viền.
+
+### 3. "Nguyên liệu phục vụ Order của tôi" — highlight trên thẻ trong tay
+
+Giữ nguyên toàn bộ spec bản trước (token `--order-need: #6a5cc4`, badge góc
+trên-trái tĩnh, không viền/glow, hue tách xa mọi hex khác trong file) —
+**đã duyệt, không đổi**. Xác nhận: dùng **song song, không thay thế**
+`.order-chip` (mục 2) — `--order-need` trả lời "thẻ *trong tay* này phục vụ
+Order" (đặt ở đúng thẻ nguyên liệu, khi kéo/chọn), `.order-chip` trả lời
+"công thức *trong Order* này còn thiếu gì" (đặt ở đúng hàng Order) — 2 câu
+hỏi khác nhau, 2 vị trí khác nhau, không tranh chấp thị giác.
+
+```html
+<svg viewBox="0 0 24 24" width="18%" fill="#6a5cc4" stroke="#6a5cc4"
+     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3 11 L11 3 L21 3 L21 13 L13 21 Z" fill="#6a5cc4"/>
+  <circle cx="16" cy="8" r="1.6" fill="rgba(0,0,0,.4)" stroke="none"/>
+</svg>
+```
+
+### 4. Màn kết thúc — reveal Order (`07-` Rule 13, 17)
+
+**Sửa:** bỏ hẳn "mini Order ticket" (component giấy thu nhỏ) của bản trước —
+`ui/menu-orders.md` (đã chốt) dùng đúng khuôn cột "Foods" có sẵn: mỗi món
+trong Order hiện dưới dạng 1 thumbnail **32×32** (`Art/Food/*`, cùng size đã
+dùng cho cột Foods, không cần asset mới) đè 1 icon trạng thái. Mục này định
+nghĩa icon đó (trả lời asset ask "end-screen ✓/✕ icons" của UI):
+
+| Trạng thái | Ảnh | Viền quanh ảnh | Icon góc dưới-phải | Vẽ bằng |
+|---|---|---|---|---|
+| Đã xong | nguyên màu | `1.5px rgba(242,193,78,.5)` — **cùng giá trị vàng nhạt với `.order-row` đã xong** (mục 2), giữ nhất quán "đã xong" xuyên suốt trong-ván và cuối-ván | ✓, nền tròn tối `rgba(0,0,0,.4)` Ø~18% ảnh, stroke `--text` | inline SVG line-art, không dùng emoji ✓ thật — nhất quán với mọi glyph khác trong file |
+| Chưa xong | `filter: brightness(.7) saturate(.6)` — **tái dùng đúng công thức dim** của locked-while-cooking, không bịa `grayscale(60%)` mới | `1px --panel-border` (trung tính, giống `.order-row` chưa xong) | ✕, nền tròn tối như trên, stroke `--text-dim` (**không** `--invalid` — chưa xong không phải lỗi thao tác) | inline SVG line-art, cùng bộ vẽ tay với ✓ |
+
+```html
+<svg viewBox="0 0 24 24" width="18%" fill="none" stroke="#f0e6d8"
+     stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.4)" stroke="none"/>
+  <path d="M6 12 L10 16 L18 7"/>
+</svg>
+<!-- ✕ chưa xong: đổi stroke sang #a89a86 (--text-dim), path "M7 7 L17 17 M17 7 L7 17" -->
+```
+
+- Hàng người thắng (`#endModal` đã có viền `--gold` quanh hàng) — viền đó lan
+  sang khối Order-thumbnails của họ, không cần viền riêng thêm (không đổi).
+- Người chưa xong Order khi ván kết thúc: hiện nguyên trạng dở dang (vài ✓,
+  vài ✕ trên cùng hàng) — không có "trạng thái thất bại" gộp riêng, đúng tinh
+  thần `04-`/`07-` "không ai bị phạt vì chưa xong Order" (không đổi).
+
+### 5. Token mới & Asset list
+
+| Token | Giá trị | Vai trò | Không dùng cho |
+|---|---|---|---|
+| `--order-need` | `#6a5cc4` | badge góc nhỏ trên thẻ nguyên liệu **của chính mình**, báo "thẻ này phục vụ 1 món trong Order của tôi" | viền/outline thẻ, food card, Menu item, thẻ của người khác, mọi hiệu ứng nhịp/rung |
+
+Không cần token mới cho: viền `.order-row`/end-screen-thumbnail "chưa xong"
+(`--panel-border`), "đã xong" (vàng nhạt = `rgba(242,193,78,.5)`, công thức
+alpha trên `--gold` có sẵn, không phải token riêng), nền Menu rail/popover
+(`--panel`, `--panel-border`), khoảnh khắc hoàn thành Order (`--gold` + Shine
+quét có sẵn), dim "chưa xong" cuối ván (công thức dim có sẵn).
+
+**Asset list — không có raster mới; sửa lỗi đếm ảnh:**
+
+| Asset | Loại | Nguồn | Ghi chú |
+|---|---|---|---|
+| `.menu-item` ảnh 40×40 | CSS + `Art/Food/*` | có sẵn (20/20 món) | `object-fit: cover`, không cắt mới |
+| Popover công thức | CSS + `Art/Card/*` crop 18×18 | có sẵn (**27** ảnh nguyên liệu trong `public/art/Card`, sửa lỗi đếm 26 của bản trước) | dùng chung cho `.menu-item` và `.order-row` |
+| `.order-chip` | CSS, tái dùng crop 18×18 ở trên (co nhỏ qua CSS) | có sẵn | không cắt ảnh riêng cho size 14×14/12×12 |
+| End-screen Order thumbnail | CSS + `Art/Food/*` 32×32 | có sẵn (cùng size cột Foods) | không raster mới |
+| Icon ✓/✕ (end-screen) | inline SVG line-art | mới vẽ, 1 cặp glyph nhỏ ở mục 4 | corner badge, tĩnh, không emoji thật |
+| Badge `order-need` | inline SVG line-art | mới vẽ (giữ nguyên bản trước) | badge góc, tĩnh |
+| ~~Que xiên (spike)~~ | — | **bỏ** | Order không còn là vật thể rời, không còn chỗ đặt prop này |
+| ~~Mini Order ticket~~ | — | **bỏ**, thay bằng End-screen Order thumbnail ở mục 4 | — |
+
+Không có prompt tạo ảnh AI cho pass này — mọi thứ vẫn CSS/SVG/ảnh có sẵn.
+
+### Câu hỏi mở còn lại cho người duyệt (không chặn `/build`)
+
+1. Số điểm trên `.menu-item`/popover dùng `--text` (trung tính) thay vì
+   `--gold`, theo đúng luật "gold = đang có thể hành động" — vẫn cần người
+   duyệt xác nhận không bị đọc nhầm là "món này không đáng giá" (giữ nguyên
+   câu hỏi này từ bản trước, chưa có quyết định mới).
+2. Course badge trên `.menu-item` bỏ chữ cái A/M/D (chỉ còn chấm màu, xem
+   mục 1) — ngoại lệ mới với luật "course color luôn kèm chữ cái." Cần người
+   duyệt xác nhận chấp nhận được, hay ưu tiên bỏ hẳn course badge khỏi
+   `.menu-item` (dồn 100% vào popover) thay vì giữ 1 chấm màu đơn độc.

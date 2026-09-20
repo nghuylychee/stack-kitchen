@@ -5,10 +5,10 @@
 //   - sends intents.
 import './table.css';
 import {
-  ART, CARDS, COOK_MS, COPIES_PER_TYPE, COURSE_NAME, FIRST_FULL_BONUS, HAND_START, RECIPES, SEATS, T, TYPE_ORDER,
-  label, recipeByDish, type CardType, type Course, type Recipe,
+  ART, CARDS, COOK_MS, COURSE_NAME, HAND_SIZE, MENU_HOLD_MS, MENU_ITEM_REVEAL_MS, ORDER_BONUS, ORDER_HOLD_MS, ORDER_ITEM_REVEAL_MS, ORDER_LAND_MS, MENU_LAND_MS, MENU_LAND_STAGGER_MS, ORDER_LAND_STAGGER_MS, REFILL_STAGGER_MS, SEATS, T, TYPE_ORDER,
+  label, recipeByDish, type CardType, type Recipe,
 } from '../core/data';
-import { formable, hasCourse, courseCount, matchRecipe, removeOne, type FoodLike } from '../core/rules';
+import { formable, matchRecipe, orderDone, removeOne, type FoodLike } from '../core/rules';
 import type { HostEvent, Intent, PublicPlayer, View } from '../core/types';
 
 // ---------------------------------------------------------------- types
@@ -22,6 +22,7 @@ type Phase = 'wait' | 'draw' | 'play' | 'collecting' | 'claim' | 'claimCook' | '
 
 interface GS {
   you: number; players: CP[]; me: Me;
+  menu: Recipe[]; order: string[];
   pool: number; discard: CardType[]; lastPlayed: CardType | null; lastBy: string | null;
   current: number; turn: number; claims: number; ended: boolean; online: boolean;
   phase: Phase; claimOpts: { card: CardType; opts: Recipe[]; by: string } | null;
@@ -30,6 +31,7 @@ interface GS {
   playFrom: Rect | null; fanMsg: string; foodIncoming: Recipe | null;
   playPending: CardType | null; collectPending: Recipe | null; collectPromise: Promise<void> | null;
   deadline: number | null;
+  expectPlay: boolean;   // my Draw/collect was sent, the host's play prompt is still in the event queue (ticket #17)
 }
 
 export interface TableHooks {
@@ -107,7 +109,7 @@ function stripClaim(me: Me) {                                       // 03 Rule 1
   }
   dropEmptyGroups(me);
 }
-const groupMatch = (gr: Group) => matchRecipe(gr.cards.map(c => c.t));
+const groupMatch = (gr: Group) => matchRecipe(gr.cards.map(c => c.t), g().menu);
 function mergeReject(tg: Group | undefined, t: CardType) {          // 02 Rule 10
   if (!tg) return 'No target';
   if (!tg.table) return 'Stack cards on the table';
@@ -115,7 +117,7 @@ function mergeReject(tg: Group | undefined, t: CardType) {          // 02 Rule 1
   if (tg.cooking) return 'Cooking…';
   const types = tg.cards.map(c => c.t).concat([t]);
   if (new Set(types).size !== types.length) return 'Already in this stack';
-  if (!RECIPES.some(r => types.every(x => r.types.includes(x)))) return 'No recipe uses these together';
+  if (!g().menu.some(r => types.every(x => r.types.includes(x)))) return 'No menu dish uses these together';
   return null;
 }
 function canCook(gr: Group | undefined) {                           // 02 Rule 11/14, 03 Rule 11
@@ -129,13 +131,6 @@ function canCook(gr: Group | undefined) {                           // 02 Rule 1
   return null;
 }
 
-function log(msg: string, cls = '', why = '') {
-  const d = document.createElement('div');
-  if (cls) d.className = cls;
-  d.textContent = msg;
-  if (why) { const s = document.createElement('span'); s.className = 'why'; s.textContent = ' — ' + why; d.appendChild(s); }
-  const L = $('log'); L.insertBefore(d, L.firstChild);
-}
 
 // ---------------------------------------------------------------- view → local state
 const emptyStk = (): Stk => ({ stack: [], food: null, collecting: null, cooking: false, cookStart: 0, arriving: 0 });
@@ -147,9 +142,9 @@ function buildState(v: View) {
   me.groups = [];
   me.hand = v.hand.slice();
   G = {
-    you: v.you, players, me, pool: v.pool, discard: v.discard.slice(), lastPlayed: v.lastPlayed, lastBy: v.lastBy,
+    you: v.you, players, me, menu: v.menu.map(d => recipeByDish(d)!), order: v.order.slice(), pool: v.pool, discard: v.discard.slice(), lastPlayed: v.lastPlayed, lastBy: v.lastBy,
     current: v.current, turn: v.turn, claims: v.claims, ended: v.ended, online: v.online,
-    phase: 'wait', claimOpts: null, dealing: false, dealt: null, dealSkip: false,
+    phase: 'wait', claimOpts: null, expectPlay: false, dealing: false, dealt: null, dealSkip: false,
     lastHidden: false, lastJust: false, newUid: null, newAt: 0, drawHidden: false, playFrom: null, fanMsg: '', foodIncoming: null,
     playPending: null, collectPending: null, collectPromise: null, deadline: null,
   };
@@ -160,8 +155,9 @@ function applyView(v: View) {
   const s = g();
   for (const pv of v.players) {
     const p = s.players[pv.idx];
-    Object.assign(p, { name: pv.name, human: pv.human, connected: pv.connected, handCount: pv.handCount, foods: pv.foods, score: pv.score, bonus: pv.bonus });
+    Object.assign(p, { name: pv.name, human: pv.human, connected: pv.connected, handCount: pv.handCount, foods: pv.foods, score: pv.score, bonus: pv.bonus, orderDone: pv.orderDone, orderSize: pv.orderSize });
     if (pv.hand) p.hand = pv.hand;
+    if (pv.order) p.order = pv.order;
   }
   s.me.hand = v.hand.slice();
   Object.assign(s, { pool: v.pool, discard: v.discard.slice(), lastPlayed: v.lastPlayed, lastBy: v.lastBy, current: v.current, turn: v.turn, claims: v.claims, ended: v.ended });
@@ -215,11 +211,12 @@ function buildSeats() {
 }
 const seatEl = (i: number) => document.querySelector(`.seat[data-p="${i}"]`) as HTMLElement;
 
-const coursesHTML = (p: { foods: FoodLike[] }) => `<span class="courses">${(['A', 'M', 'D'] as Course[]).map(c => `<span class="course ${c} ${hasCourse(p, c) ? 'have' : ''}" title="${COURSE_NAME[c]}">${c}</span>`).join('')}</span>`;
 function headHTML(p: CP) {
   return `<div class="head1"><span class="stool ${p.idx % 2 ? 'b' : 'r'}"></span><span class="plate">${playerName(p)}</span><span class="score" id="score-${p.idx}">${p.score} pts</span></div>
-    <div class="head2"><span class="stat"><span class="backicon"></span>×<b>${visCount(p)}</b></span>${coursesHTML(p)}</div>`;
+    <div class="head2"><span class="stat"><span class="backicon"></span>×<b>${visCount(p)}</b></span>${pipsHTML(p)}</div>`;
 }
+// 09 Rule 5 — Order progress as dots only: no number, no "Order" label, no dish identity
+const pipsHTML = (p: CP) => p.orderSize ? `<span class="opips">${Array.from({ length: p.orderSize }, (_, i) => `<i${i < p.orderDone ? ' class="on"' : ''}></i>`).join('')}</span>` : '';
 function progHTML(start: number) {
   const el = Date.now() - start;
   return `<div class="prog"><i style="animation-duration:${COOK_MS}ms;animation-delay:-${Math.min(el, COOK_MS)}ms"></i></div><div class="steam"><span></span><span></span><span></span></div>`;
@@ -233,7 +230,7 @@ function render() {
   if (!G) return;
   const s = G;
   const n = s.players.length;
-  const undealt = s.dealing ? HAND_START * n - s.dealt!.reduce((a, b) => a + b, 0) : 0;
+  const undealt = s.dealing ? HAND_SIZE * n - s.dealt!.reduce((a, b) => a + b, 0) : 0;
   const poolShown = s.pool + undealt;
   $('cTurn').textContent = String(s.turn);
   const me = s.me;
@@ -290,9 +287,7 @@ function render() {
 
   // ---- my panel ----
   $('dock').classList.toggle('active', s.current === s.you && !s.ended && !s.dealing);
-  $('my-h1').innerHTML = `<span class="stool r"></span><span class="plate">${playerName(me)}</span><span class="score" id="score-${me.idx}">${me.score} pts</span>`;
-  $('my-h2').innerHTML = coursesHTML(me);
-  $('my-h3').innerHTML = `<span class="stat"><span class="backicon"></span>×<b>${humanCardCount(me)}</b></span>`;
+  $('my-h1').innerHTML = `<span class="stool r"></span><span class="plate">${playerName(me)}</span><span class="stat"><span class="backicon"></span>×<b>${humanCardCount(me)}</b></span><span class="score" id="score-${me.idx}">${me.score} pts</span>`;
   const fk = me.foods.length + '|' + (s.foodIncoming ? s.foodIncoming.dish : '');
   if (fk !== foodsKey) {
     foodsKey = fk;
@@ -300,9 +295,137 @@ function render() {
     mf.innerHTML = me.foods.map(f => foodThumb(f, 'sm')).join('') + (s.foodIncoming ? foodThumb(s.foodIncoming, 'sm', 'incoming') : '');
     mf.scrollTop = mf.scrollHeight;
   }
+  renderOrder(me);
   renderTimer();
   renderFan(me);
 }
+
+// ---------------------------------------------------------------- menu & order (ui/menu-orders.md)
+let railHidden = false, orderHidden = false;  // true until the start-of-game intro lands them (10 Rule 3, 5)
+let orderKey = '';
+let justDone: { dish: string; at: number } | null = null;
+const recipesOf = (dishes: string[]) => dishes.map(d => recipeByDish(d)!);
+// ingredient types that still serve an unfinished dish of my Order (07 Rule 9)
+const needTypes = (me: Me) => new Set(recipesOf(g().order.filter(d => !orderDone(me, d))).flatMap(r => r.types));
+
+function renderRail() {
+  const s = g();
+  $('menu-rail').innerHTML = railHidden ? '' : s.menu.map(r =>
+    `<div class="menu-item cc-${r.c}" data-menu="${esc(r.dish)}"><img src="${ART}Food/${r.img}" alt="" draggable="false"><span class="dot"></span><span class="p">+${r.pts}</span></div>`).join('');
+}
+
+function renderOrder(me: Me) {
+  const s = g();
+  const rows = recipesOf(s.order);
+  const key = orderHidden ? 'hidden' : rows.map(r => (orderDone(me, r.dish) ? 'd' : 'o') + r.types.map(t => (me.hand.includes(t) ? 1 : 0)).join('')).join('|');
+  if (key === orderKey) return;
+  orderKey = key;
+  const el = $('my-order');
+  el.className = 'n' + rows.length;
+  if (orderHidden) { el.innerHTML = ''; return; }
+  const just = justDone && Date.now() - justDone.at < 400 ? justDone.dish : null;
+  el.innerHTML = '<div class="oh">YOUR ORDER</div>' + rows.map(r => {
+    const done = orderDone(me, r.dish);
+    const chips = r.types.map(t => `<img class="order-chip${me.hand.includes(t) ? ' have' : ''}" src="${ART}Card/${CARDS[t][1]}" alt="" title="${label(t)}" draggable="false">`).join('');
+    return `<div class="order-row${done ? ' done' : ''}${just === r.dish ? ' just' : ''}" data-menu="${esc(r.dish)}">` +
+      `<span class="st">${done ? '✓' : '○'}</span><span class="nm">${r.dish}</span><span class="pt">+${r.pts}</span><span class="chips">${chips}</span></div>`;
+  }).join('');
+}
+
+// start of game (10-match-intro.md): Menu one dish at a time → my Order one dish at a time → deal.
+// Skip is local only; the host always waits the full introMs().
+async function introWait(ms: number, tok: number, stop: () => boolean) {
+  let left = ms, last = performance.now();
+  while (left > 0 && !stop() && tok === gameToken) {
+    await new Promise(r => setTimeout(r, Math.min(50, left)));
+    const now = performance.now();
+    if (!document.hidden) left -= now - last;                         // countdown pauses while the tab is hidden
+    last = now;
+  }
+}
+// one step: items (.ii) appear `step` ms apart; 1st tap shows the rest now, a tap during the hold ends the step
+async function introStep(id: 'menu' | 'order', html: string, step: number, hold: number, tok: number, keep = false) {
+  const m = $(id + 'IntroModal');
+  $(id + 'IntroBox').innerHTML = html;
+  const items = [...m.querySelectorAll<HTMLElement>('.ii')];
+  let tapped = catchUp;
+  const tap = () => { tapped = true; };
+  m.addEventListener('pointerup', tap);
+  m.classList.add('show');
+  for (let i = 0; i < items.length && tok === gameToken; i++) {
+    if (tapped) { items.slice(i).forEach(e => e.classList.add('in', 'now')); break; }
+    items[i].classList.add('in');
+    if (i < items.length - 1) await introWait(step, tok, () => tapped);
+  }
+  tapped = catchUp;
+  await introWait(dur(T.introPop + hold), tok, () => tapped);
+  m.removeEventListener('pointerup', tap);
+  if (!keep) m.classList.remove('show');
+  checkToken(tok);
+}
+// 10 Rule 3/5: the overlay fades while each dish flies + shrinks into its slot (Menu → #menu-rail, Order → #my-order)
+async function introLand(id: 'menu' | 'order', tok: number) {
+  const m = $(id + 'IntroModal');
+  m.querySelectorAll('.ii').forEach(e => e.classList.add('now'));     // measure the settled layout, not a mid-flip frame
+  const imgs = [...m.querySelectorAll<HTMLImageElement>('.ii img')];
+  const from = imgs.map(e => e.getBoundingClientRect());
+  let targets: HTMLElement[];
+  if (id === 'menu') { railHidden = false; renderRail(); targets = [...document.querySelectorAll<HTMLElement>('#menu-rail .menu-item')]; }
+  else { orderHidden = false; orderKey = ''; render(); targets = [...document.querySelectorAll<HTMLElement>('#my-order .order-row')]; }
+  const [each, stagger] = id === 'menu' ? [MENU_LAND_MS, MENU_LAND_STAGGER_MS] : [ORDER_LAND_MS, ORDER_LAND_STAGGER_MS];
+  targets.forEach(t => { t.style.visibility = 'hidden'; });
+  m.classList.add('leaving');
+  targets.forEach((t, i) => {
+    const a = from[i]; if (!a || !imgs[i]) { t.style.visibility = ''; return; }
+    const b = (id === 'menu' ? t.querySelector('img') ?? t : t).getBoundingClientRect();
+    const f = document.createElement('img');
+    f.className = 'intro-fly ' + id; f.src = imgs[i].src; f.draggable = false;
+    Object.assign(f.style, { left: a.left + 'px', top: a.top + 'px', width: a.width + 'px', height: a.height + 'px' });
+    document.body.appendChild(f);
+    const s = b.height / a.height, delay = dur(i * stagger), ms = dur(each);
+    f.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${b.left - a.left}px,${b.top - a.top}px) scale(${s})`, opacity: .6 }],
+      { duration: ms, delay, easing: 'cubic-bezier(.5,0,.25,1)', fill: 'forwards' });
+    setTimeout(() => { f.remove(); if (tok === gameToken) { t.style.visibility = ''; t.classList.add('land'); } }, delay + ms);
+  });
+  await wait(dur((targets.length - 1) * stagger + each));
+  document.querySelectorAll('.intro-fly.' + id).forEach(e => e.remove());
+  targets.forEach(t => { t.style.visibility = ''; });
+  m.classList.remove('show', 'leaving');
+  checkToken(tok);
+}
+async function menuIntro(tok: number) {
+  const s = g();
+  const item = (r: Recipe) => `<div class="ii cc-${r.c}"><img src="${ART}Food/${r.img}" alt="" draggable="false"><b>${r.dish}</b><span class="c">${COURSE_NAME[r.c]} · +${r.pts}</span></div>`;
+  await introStep('menu', `<h2>Today's menu</h2><div class="grid">${s.menu.map(item).join('')}</div><div class="skip">Tap to skip</div>`,
+    MENU_ITEM_REVEAL_MS, MENU_HOLD_MS, tok, true);
+  await introLand('menu', tok);
+  await wait(dur(T.introSwap));
+  await introStep('order', `<h2>Your order</h2><p class="goal">Cook every dish on this list to <b>end the match instantly</b> and score a big bonus <b>+${ORDER_BONUS}</b>.<br>You can still cook anything else on the Menu for points.</p>` +
+    `<div class="grid">${recipesOf(s.order).map(item).join('')}</div><div class="skip">Tap to skip · only you can see this</div>`,
+    ORDER_ITEM_REVEAL_MS, ORDER_HOLD_MS, tok, true);
+  await introLand('order', tok);
+  await wait(dur(T.menuGap));
+  checkToken(tok);
+}
+
+// recipe popover shared by .menu-item and .order-row
+const pop = () => $('recipe-pop');
+function showPop(el: HTMLElement) {
+  const r = recipeByDish(el.dataset.menu!); if (!r || !G) return;
+  const hand = G.me.hand;
+  const p = pop();
+  p.className = 'cc-' + r.c;
+  p.innerHTML = `<div class="t"><span class="cdot">${r.c}</span><span>${r.dish}</span><span class="pt">+${r.pts}</span></div><div class="ings">${r.types.map(t =>
+    `<span class="ing${hand.includes(t) ? ' have' : ''}"><img src="${ART}Card/${CARDS[t][1]}" alt="" draggable="false">${label(t)}</span>`).join('')}</div>`;
+  p.hidden = false;
+  const er = el.getBoundingClientRect(), pr = p.getBoundingClientRect();
+  const below = er.bottom + 6 + pr.height < window.innerHeight;
+  p.style.left = clamp(er.left + er.width / 2 - pr.width / 2, 6, window.innerWidth - pr.width - 6) + 'px';
+  p.style.top = (below ? er.bottom + 6 : er.top - pr.height - 6) + 'px';
+  popFor = el.dataset.menu!;
+}
+let popFor: string | null = null, popTimer: ReturnType<typeof setTimeout> | undefined;
+function hidePop() { clearTimeout(popTimer); popFor = null; pop().hidden = true; }
 
 function renderTimer() {
   const el = $('cTimer');
@@ -339,9 +462,10 @@ function renderFan(me: Me) {
   const base = Math.max(2, H - 134 - 4);
   const dip = mid > 0 ? 12 / (mid * mid) : 0;
   let useful = new Set<CardType>();
-  if (s.phase === 'play') useful = new Set(formable(me.hand).flatMap(r => r.types));
+  if (s.phase === 'play') useful = new Set(formable(me.hand, s.menu).flatMap(r => r.types));
   if (s.phase === 'claim' && s.claimOpts) useful = new Set(s.claimOpts.opts.flatMap(r => r.types).filter(t => t !== s.claimOpts!.card));
   const newOn = s.newUid !== null && Date.now() - s.newAt < T.newRing;
+  const need = needTypes(me);
   const keep = new Map<string, HTMLElement>();
   fan.querySelectorAll<HTMLElement>(':scope > .hgroup').forEach(e => keep.set(e.dataset.gid!, e));
   let uiHtml = '';
@@ -366,6 +490,7 @@ function renderFan(me: Me) {
       if (gr.cooking) cls.push('locked');
       if (c.claim) cls.push('claimable');
       else if (useful.has(c.t) && !gr.cooking) cls.push('useful');
+      if (!c.claim && need.has(c.t)) cls.push('need');
       const isNew = c.uid === s.newUid;
       if (isNew && newOn) cls.push('new');
       if ((isNew && s.drawHidden) || c.arriving || (drag && drag.ghost && drag.src.uid === c.uid)) cls.push('incoming');
@@ -391,6 +516,7 @@ function renderPrep(me: Me, useful: Set<CardType>) {
   const keep = new Map<string, HTMLElement>();
   box.querySelectorAll<HTMLElement>(':scope > .hgroup').forEach(e => keep.set(e.dataset.gid!, e));
   const cookable = groups.map(x => canCook(x));
+  const btns = new Set<HTMLElement>();
   let uiHtml = '';
   groups.forEach((gr, i) => {
     const cnt = gr.food ? 1 : gr.cards.length;
@@ -427,25 +553,19 @@ function renderPrep(me: Me, useful: Set<CardType>) {
     }
     wob.innerHTML = inner;
     const cr = cookable[i];
-    if (cr) uiHtml += `<button class="primary cookbtn" data-act="cook" data-gid="${gr.id}" title="Cook ${cr.dish} +${cr.pts}" style="left:${x + fanW / 2}px;top:${yTop + FAN_H - 22}px;transform:translateX(-50%);max-width:240px">Cook ${cr.dish} +${cr.pts}</button>`;
+    if (cr) {                                                         // reuse the button across renders so its pop-in plays once (Tuning pass (9))
+      let b = box.querySelector<HTMLElement>(`:scope > .cookbtn[data-gid="${gr.id}"]`);
+      if (!b) { b = elFrom(`<button class="primary cookbtn" data-act="cook" data-gid="${gr.id}">COOK</button>`); box.appendChild(b); }
+      b.title = `Cook ${cr.dish} +${cr.pts}`;
+      b.style.cssText = `left:${x + fanW / 2}px;top:${yTop + FAN_H - 22}px;translate:-50% 0`;   // `translate`, not `transform`: the pop-in `scale` would shrink a transform offset
+      btns.add(b);
+    }
   });
   keep.forEach(e => e.remove());
-  box.querySelectorAll(':scope > .cookbtn, :scope > .prep-tip').forEach(e => e.remove());
+  box.querySelectorAll(':scope > .cookbtn').forEach(e => { if (!btns.has(e as HTMLElement)) e.remove(); });
+  box.querySelectorAll(':scope > .prep-tip').forEach(e => e.remove());
   if (!n && !tipDone && Date.now() < tipUntil && s.phase === 'play') uiHtml += `<div class="prep-tip">Stack here to cook</div>`;
   box.insertAdjacentHTML('beforeend', uiHtml);
-}
-
-function renderRecipes() {
-  const me = G ? G.me : null;
-  const rows = (['A', 'M', 'D'] as Course[]).map(c => RECIPES.filter(r => r.c === c).map(r => {
-    const can = me && r.types.every(t => me.hand.includes(t));
-    return `<tr class="${can ? 'can' : ''}"><td><span class="sw cc-${c}"></span><b>${c}</b> ${COURSE_NAME[c]}</td><td>${foodThumb(r, 'th')} <b>${r.dish}</b></td><td>+${r.pts}</td><td>${r.types.map(label).join(' + ')}</td></tr>`;
-  }).join('')).join('');
-  $('recipeBox').innerHTML = `<h2>Recipes <span style="font-size:12px;color:var(--gold)">(gold = in your hand now)</span></h2>
-    <table class="recipes"><tr><th>Course</th><th>Food</th><th>Pts</th><th>Ingredients</th></tr>${rows}</table>
-    <div style="margin-top:8px;font-size:12px;color:var(--text-dim)">${COPIES_PER_TYPE} copies of each ingredient. First to own all 3 courses: +${FIRST_FULL_BONUS}, game ends.</div>
-    <div class="row"><button id="btnCloseRec">Close</button></div>`;
-  $('btnCloseRec').addEventListener('pointerup', () => $('recipeModal').classList.remove('show'));
 }
 
 // ---------------------------------------------------------------- animation
@@ -483,7 +603,7 @@ async function dealAnim(tok: number) {
   s.dealing = true; s.dealt = s.players.map(() => 0); s.dealSkip = false; render();
   await wait(200);
   const poolR = rectOf($('pool-pile'));
-  for (let k = 0; k < HAND_START && !s.dealSkip; k++) for (let j = 0; j < n && !s.dealSkip; j++) {
+  for (let k = 0; k < HAND_SIZE && !s.dealSkip; k++) for (let j = 0; j < n && !s.dealSkip; j++) {
     const i = (s.current + j) % n, p = s.players[i];
     const mine = i === s.you;
     const to = mine ? sized(rectOf($('hand-fan')), 96, 134) : backsTarget(p);
@@ -544,21 +664,37 @@ async function seatCollect(p: CP, r: Recipe) {
   return to;
 }
 
-async function finishCook(gr: Group) {
+// one fold per group: the local timer and a late host event may both ask for it (Tuning pass (9))
+const folding = new WeakMap<Group, Promise<void>>();
+function finishCook(gr: Group) {
+  let p = folding.get(gr);
+  if (!p) { p = foldCook(gr); folding.set(gr, p); }
+  return p;
+}
+// start the fold the moment the progress bar ends, not when the host's next event arrives
+function foldWhenDone(gr: Group) {
+  const tok = gameToken;
+  wait(Math.max(0, gr.cookStart + COOK_MS - Date.now()))
+    .then(() => { if (tok === gameToken && ME().groups.includes(gr) && gr.cooking) return finishCook(gr); }).catch(noop);
+}
+async function foldCook(gr: Group) {
+  // ui/table.md Tuning pass (8): fold each card onto the middle one — the group itself never moves
   const el = document.querySelector(`#prep .hgroup[data-gid="${gr.id}"]`) as HTMLElement | null;
   if (el) {
-    const anim = el.animate([
-      { transform: 'scaleX(1)' },
-      { transform: 'scaleX(.1)', offset: .8 },
-      { transform: 'scaleX(.1) scaleY(.92)' },
-    ], { duration: dur(T.fanClose), easing: 'ease-in', fill: 'forwards' });
+    const cards = [...el.querySelectorAll<HTMLElement>('.card')];
+    const mid = (cards.length - 1) / 2, yMid = (FAN_H - PREP_H) / 2;
+    const anims = cards.map((c, k) => c.animate([
+      { transform: c.style.transform || 'none', top: c.style.top },
+      { transform: `translateX(${(mid - k) * FAN_DX}px) rotate(0deg)`, top: `${yMid}px`, offset: .75 },
+      { transform: `translateX(${(mid - k) * FAN_DX}px) scale(.9, .96)`, top: `${yMid}px` },
+    ], { duration: dur(T.fanClose), easing: 'cubic-bezier(.5,0,.3,1)', fill: 'forwards' }));
     const tok = gameToken;
-    await Promise.race([anim.finished.catch(noop), wait(dur(T.fanClose) + 80).catch(noop)]);   // hidden tabs may never finish WAAPI
-    anim.cancel();
+    await Promise.race([Promise.all(anims.map(a => a.finished)).catch(noop), wait(dur(T.fanClose) + 80).catch(noop)]);   // hidden tabs may never finish WAAPI
     checkToken(tok);
   }
   gr.cooking = false; gr.food = gr.cookR; gr.cards = []; gr.fresh = true;
   render();
+  el?.getAnimations().forEach(a => a.finish());                       // fan → food narrows the group: snap, don't slide its --x
   if (el) smokeAt(rectOf(el));
 }
 
@@ -585,7 +721,7 @@ function collectFromGroup(gr: Group, viaClaim: boolean) {
 function collectFood(gr: Group | undefined, fromRect: Rect) {
   const s = g();
   if (s.phase !== 'play' || !gr || !gr.food) return;
-  s.phase = 'collecting';
+  s.phase = 'collecting'; s.expectPlay = true;
   hooks!.send({ t: 'collect' });
   s.collectPromise = collectFly(gr, gr.food, fromRect, false).catch(e => { if (!(e instanceof Abort)) console.error(e); });
 }
@@ -633,7 +769,7 @@ let pumping = false;
 
 export function onHostEvent(ev: HostEvent) {
   if (!hooks) return;
-  if (ev.t === 'log') { log(ev.msg, ev.cls, ev.why); return; }
+  if (ev.t === 'log') return;                                         // ui/table.md (7): no Log UI — host still sends
   if (ev.t === 'toast') { toast(ev.msg); return; }
   if (ev.t === 'reject') { toast(ev.msg, 1500); return; }
   if (ev.t === 'start' || ev.t === 'sync') { queue.length = 0; gameToken++; }
@@ -657,9 +793,12 @@ async function pump() {
 function resetTableDom() {
   $('endModal').classList.remove('show');
   $('fx').innerHTML = ''; $('drag-layer').innerHTML = ''; drag = null;
-  document.querySelectorAll('.pop,.smoke').forEach(e => e.remove());
+  document.querySelectorAll('.pop,.smoke,.intro-fly').forEach(e => e.remove());
+  $('menuIntroModal').classList.remove('leaving'); $('orderIntroModal').classList.remove('leaving');
   $('toast').classList.remove('show');
-  $('my-panel').classList.remove('hot');
+  $('my-foods').classList.remove('hot');
+  $('menuIntroModal').classList.remove('show'); $('orderIntroModal').classList.remove('show');
+  hidePop(); orderKey = ''; justDone = null;
   document.querySelectorAll('#hand-fan > .hgroup, #prep > .hgroup').forEach(e => e.remove());
   foodsKey = '';
 }
@@ -669,15 +808,20 @@ async function handle(ev: HostEvent) {
   switch (ev.t) {
     case 'start': {
       resetTableDom();
-      $('log').innerHTML = '';
       buildState(ev.view);
-      buildSeats(); render();
+      const s = g();
+      s.dealing = true; s.dealt = s.players.map(() => 0);            // hand stays hidden under the intro
+      railHidden = orderHidden = true;
+      buildSeats(); renderRail(); render();
+      await menuIntro(tok);
       await dealAnim(tok);
       return;
     }
     case 'sync': {
       resetTableDom();
       buildState(ev.view);
+      railHidden = orderHidden = false;                  // rejoin: no intro replay
+      renderRail();
       const s = g();
       s.phase = ev.view.ended ? 'over' : ev.phase;
       s.deadline = ev.msLeft !== null ? Date.now() + ev.msLeft : null;
@@ -696,6 +840,7 @@ async function handle(ev: HostEvent) {
       const s = g();
       applyView(ev.view);
       s.deadline = ev.msLeft !== null ? Date.now() + ev.msLeft : null;
+      s.expectPlay = false;
       if (ev.kind === 'draw') s.phase = 'draw';
       else {
         s.phase = 'play';
@@ -708,6 +853,7 @@ async function handle(ev: HostEvent) {
     case 'draw': {
       const s = g();
       const p = s.players[ev.seat];
+      const ms = ev.refill ? REFILL_STAGGER_MS : T.draw;             // 08 Rule 11 — same constant the host waits
       if (ev.seat === s.you) {
         s.phase = 'wait';
         const [nc] = applyView(ev.view);
@@ -715,12 +861,12 @@ async function handle(ev: HostEvent) {
         render();
         const el = $('hand-fan').querySelector(`.card[data-uid="${s.newUid}"]`);
         const to = el ? rectOf(el) : sized(rectOf($('hand-fan')), 96, 134);
-        await fly(ingHTML(ev.card!, 'center', 'shine'), rectOf($('pool-pile')), to, T.draw);
+        await fly(ingHTML(ev.card!, 'center', 'shine'), rectOf($('pool-pile')), to, ms);
         s.drawHidden = false; render();
         const uid = s.newUid;
         setTimeout(() => { if (G && G.newUid === uid) render(); }, T.newRing + 30);
       } else {
-        await fly(backHTML('center'), rectOf($('pool-pile')), backsTarget(p), T.draw);
+        await fly(backHTML('center'), rectOf($('pool-pile')), backsTarget(p), ms);
         applyView(ev.view); render();
       }
       return;
@@ -760,7 +906,13 @@ async function handle(ev: HostEvent) {
         }
         s.collectPending = null;
         if (s.phase === 'collecting') s.phase = ev.viaClaim ? 'wait' : 'play';
-        applyView(ev.view); render();
+        const wasDone = orderDone(s.me, r.dish);
+        applyView(ev.view);
+        if (s.order.includes(r.dish) && !wasDone) {
+          justDone = { dish: r.dish, at: Date.now() }; orderKey = '';
+          toast(`Order ${s.order.filter(d => orderDone(s.me, d)).length}/${s.order.length} done`, 1500);
+        }
+        render();
       } else {
         const p = s.players[ev.seat];
         const to = await seatCollect(p, r);
@@ -791,7 +943,7 @@ async function handle(ev: HostEvent) {
     case 'claimOpen': {
       const s = g();
       applyView(ev.view);
-      s.phase = 'claim';
+      s.phase = 'claim'; s.expectPlay = false;
       s.claimOpts = { card: ev.card, by: ev.by, opts: ev.opts.map(d => recipeByDish(d)!) };
       s.deadline = ev.msLeft !== null ? Date.now() + ev.msLeft : null;
       render();
@@ -811,6 +963,8 @@ async function handle(ev: HostEvent) {
         for (const gr of s.me.groups) gr.cards.forEach(c => (c.claim = false));
         s.lastHidden = true; s.claimOpts = null; s.phase = 'collecting';
         applyView(ev.view); render();
+        const cg = s.me.groups.find(x => x.cooking);                 // won: fold on our own clock, 'reveal' comes ~1s after COOK_MS
+        if (cg) foldWhenDone(cg);
         return;
       }
       let fromEl: Rect | null = null;
@@ -852,7 +1006,7 @@ async function handle(ev: HostEvent) {
     case 'end': {
       const s = g();
       applyView(ev.view);
-      s.phase = 'over'; s.deadline = null; s.claimOpts = null;
+      s.phase = 'over'; s.deadline = null; s.claimOpts = null; s.expectPlay = false;
       showEnd(ev.reason, ev.finisher);
       render();
       return;
@@ -860,24 +1014,29 @@ async function handle(ev: HostEvent) {
   }
 }
 
-function showEnd(reason: 'full' | 'pool' | null, finisher: number | null) {
+const TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#f0e6d8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.4)" stroke="none"/><path d="M6 12 L10 16 L18 7"/></svg>';
+const CROSS_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#a89a86" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.4)" stroke="none"/><path d="M7 7 L17 17 M17 7 L7 17"/></svg>';
+const orderThumb = (r: Recipe, done: boolean) =>
+  `<span class="othumb ${done ? 'done' : 'miss'}" title="${r.dish}${done ? ' — done' : ' — not done'}"><img src="${ART}Food/${r.img}" alt="" draggable="false">${done ? TICK_SVG : CROSS_SVG}</span>`;
+
+function showEnd(reason: 'order' | 'pool' | null, finisher: number | null) {
   const s = g();
   const nameOf = (p: CP) => (p.idx === s.you ? 'You' : esc(p.name));
   const ranked = [...s.players].sort((a, b) => b.score - a.score);
   const top = ranked[0].score;
   const rows = ranked.map(p => {
     const foods = p.foods.map(f => `<span class="fitem">${foodThumb(f, 'th')}${f.dish}</span>`).join('') || '—';
-    return `<tr class="${p.score === top ? 'win' : ''}"><td>${p.score === top ? '🏆 ' : ''}<b>${nameOf(p)}</b></td><td class="score" style="margin:0">${p.score}</td><td>${p.bonus ? '+' + p.bonus : ''}</td><td>${courseCount(p)}/3</td><td>${foods}</td></tr>`;
+    return `<tr class="${p.score === top ? 'win' : ''}"><td>${p.score === top ? '🏆 ' : ''}<b>${nameOf(p)}</b>${reason === 'order' && finisher === p.idx ? '<span class="tagfirst">Finished order first</span>' : ''}</td><td class="score" style="margin:0">${p.score}</td><td>${p.bonus ? '+' + p.bonus : ''}</td><td>${recipesOf(p.order || []).map(r => orderThumb(r, orderDone(p, r.dish))).join('')}</td><td>${foods}</td></tr>`;
   }).join('');
   const fin = finisher !== null ? s.players[finisher] : null;
-  const why = reason === 'full' && fin ? `${nameOf(fin)} completed 3 courses` : reason === 'pool' ? 'pool empty' : '';
+  const why = reason === 'order' && fin ? `${nameOf(fin)} completed ${fin.idx === s.you ? 'your' : 'their'} order` : reason === 'pool' ? 'pool empty' : '';
   const again = !s.online || hooks!.isHost
     ? `<button class="primary" id="btnAgain">Play again</button>`
     : `<span class="chip">Waiting for host…</span>`;
   $('endBox').innerHTML = `<h2>Game over${why ? ' — ' + why : ''}</h2>
-    <div style="color:var(--text-dim)">${reason === 'full' && fin ? `${nameOf(fin)} completed Appetizer + Main + Dessert first (+${FIRST_FULL_BONUS}).` : reason === 'pool' ? 'Pool empty — no finish bonus.' : ''}
+    <div style="color:var(--text-dim)">${reason === 'order' && fin ? `${nameOf(fin)} finished ${fin.idx === s.you ? 'your' : 'their'} order first (+${ORDER_BONUS}).` : reason === 'pool' ? 'Pool empty — no finish bonus.' : ''}
     Turns: ${s.turn} · Claims: ${s.claims} · Pool left: ${s.pool}</div>
-    <table class="recipes" style="margin-top:8px"><tr><th>Player</th><th>Score</th><th>Bonus</th><th>Courses</th><th>Foods</th></tr>${rows}</table>
+    <table class="recipes" style="margin-top:8px"><tr><th>Player</th><th>Score</th><th>Bonus</th><th>Order</th><th>Foods</th></tr>${rows}</table>
     <div class="row">${again}<button id="btnCloseEnd">View table</button><button id="btnEndHome">Home</button></div>`;
   $('endModal').classList.add('show');
   document.getElementById('btnAgain')?.addEventListener('pointerup', () => { $('endModal').classList.remove('show'); hooks!.onAgain(); });
@@ -887,9 +1046,24 @@ function showEnd(reason: 'full' | 'pool' | null, finisher: number | null) {
 
 // ---------------------------------------------------------------- input
 interface DragSrc { kind: string; el: HTMLElement; uid?: number; gid?: number | null; t?: CardType; claim?: boolean; table?: boolean; top?: boolean; solo?: boolean }
-interface Drag { src: DragSrc; id: number; x0: number; y0: number; lx: number; lt: number; vx: number; tilt: number; ghost: HTMLElement | null; rect: Rect; tok: number; snapping?: boolean }
+interface Drag { src: DragSrc; id: number; x0: number; y0: number; lx: number; lt: number; vx: number; tilt: number; ghost: HTMLElement | null; rect: Rect; tok: number; snapping?: boolean;
+  trail: { x: number; y: number; t: number }[] }   // recent pointer path, for fling drops (ui/table.md Edge cases)
 let drag: Drag | null = null;
 const app = () => $('app');
+
+// #17: a card dropped on the play slot before the host's play prompt was processed — keep it hidden in the
+// hand and play it the moment the prompt lands; if it never does (game ended, claim window), show it again.
+async function deferPlay(uid: number, fromRect: Rect) {
+  const tok = gameToken, me = ME();
+  const f = findCard(me, uid); if (!f) return;
+  f.c.arriving = true; render();
+  const t0 = Date.now();
+  while (tok === gameToken && G && G.expectPlay && G.phase !== 'play' && Date.now() - t0 < 3000) await wait(30).catch(noop);
+  if (tok !== gameToken || !G) return;
+  const c = findCard(ME(), uid);
+  if (c) c.c.arriving = false;
+  if (G.phase !== 'play' || !playCard(uid, fromRect)) render();
+}
 
 function playCard(uid: number, fromRect: Rect) {                    // 03 Rule 1
   const s = g();
@@ -911,15 +1085,14 @@ function cookPress(gid: number) {
   if (s.phase === 'claim') { s.phase = 'claimCook'; s.deadline = null; render(); hooks!.send({ t: 'claimCook', dish: r.dish }); return; }   // 03 Rule 12
   render();
   hooks!.send({ t: 'cook', dish: r.dish });
-  const tok = gameToken;
-  wait(COOK_MS).then(() => { if (tok === gameToken && ME().groups.includes(gr) && gr.cooking) return finishCook(gr); }).catch(noop);
+  foldWhenDone(gr);
 }
 
 function doAct(el: HTMLElement) {
   const s = G;
   if (!s || s.ended) return;
   const a = el.dataset.act;
-  if (a === 'pool' && s.phase === 'draw') { s.phase = 'wait'; s.deadline = null; render(); hooks!.send({ t: 'draw' }); }
+  if (a === 'pool' && s.phase === 'draw') { s.phase = 'wait'; s.expectPlay = true; s.deadline = null; render(); hooks!.send({ t: 'draw' }); }
   else if (a === 'pass' && s.phase === 'claim') { stripClaim(ME()); s.phase = 'wait'; s.claimOpts = null; s.deadline = null; render(); hooks!.send({ t: 'pass' }); }
   else if (a === 'cook') cookPress(+el.dataset.gid!);
 }
@@ -945,18 +1118,18 @@ function hitAt(x: number, y: number): { kind: string; gid?: number; el?: HTMLEle
   for (const el of document.elementsFromPoint(x, y)) {
     const gg = el.closest('.hgroup') as HTMLElement | null;
     if (gg) return { kind: 'group', gid: +gg.dataset.gid!, el: gg };
-    if (el.closest('#my-panel')) return { kind: 'panel' };
+    if (el.closest('#my-foods')) return { kind: 'panel' };          // (7) food drop zone moved out of #my-panel
     if (el.closest('#center-play')) return { kind: 'center' };
   }
   if (inRect($('center-play'), x, y, 30)) return { kind: 'center' };
-  if (inRect($('my-panel'), x, y, 6)) return { kind: 'panel' };
+  if (inRect($('my-foods'), x, y, 6)) return { kind: 'panel' };
   if (inRect($('prep'), x, y, 16)) return { kind: 'table' };
   if (inRect($('hand-fan'), x, y, 20)) return { kind: 'fan' };
   return null;
 }
 function clearHints() {
   document.querySelectorAll('.hgroup.drop-ok, .hgroup.drop-bad').forEach(e => e.classList.remove('drop-ok', 'drop-bad'));
-  $('my-panel').classList.remove('hot'); $('prep').classList.remove('hot', 'show'); $('last-slot').classList.remove('play-hot');
+  $('my-foods').classList.remove('hot'); $('prep').classList.remove('hot', 'show'); $('last-slot').classList.remove('play-hot');
 }
 function flashBad(el: Element | null | undefined) {
   if (!el) return;
@@ -1018,6 +1191,7 @@ function onDrop(d: Drag, x: number, y: number): 'ok' | 'quiet' | 'bad' {
   }
   if (h && h.kind === 'center') {
     if (!s.top) return 'bad';
+    if (g().phase !== 'play' && g().expectPlay) { deferPlay(s.uid!, consume(d)); return 'ok'; }   // #17
     if (g().phase !== 'play') { toast(g().phase === 'claim' ? 'Not your turn — claim or Pass' : 'Not your turn', 1200); return 'bad'; }
     const gr = rectOf(d.ghost!);
     if (!playCard(s.uid!, gr)) return 'bad';
@@ -1064,7 +1238,7 @@ function onPointerDown(e: PointerEvent) {
   const kind = d.dataset.drag!, me = ME();
   const src: DragSrc = { kind, el: d };
   if (kind === 'hand') {
-    if (!['play', 'claim'].includes(s.phase)) return;
+    if (!['play', 'claim'].includes(s.phase) && !s.expectPlay) return;   // #17: don't swallow a grab made right after Draw/collect
     const f = findCard(me, +d.dataset.uid!); if (!f || f.g.cooking) return;
     if (f.c.claim && s.phase !== 'claim') return;
     Object.assign(src, { uid: f.c.uid, gid: f.g.id, t: f.c.t, claim: f.c.claim, table: f.g.table, top: f.k === f.g.cards.length - 1, solo: f.g.cards.length === 1 });
@@ -1078,7 +1252,7 @@ function onPointerDown(e: PointerEvent) {
   } else return;
   e.preventDefault();
   try { app().setPointerCapture(e.pointerId); } catch { /* ignore */ }
-  drag = { src, id: e.pointerId, x0: e.clientX, y0: e.clientY, lx: e.clientX, lt: performance.now(), vx: 0, tilt: 0, ghost: null, rect: rectOf(d), tok: gameToken };
+  drag = { src, id: e.pointerId, x0: e.clientX, y0: e.clientY, lx: e.clientX, lt: performance.now(), vx: 0, tilt: 0, ghost: null, rect: rectOf(d), tok: gameToken, trail: [] };
 }
 
 function onPointerMove(e: PointerEvent) {
@@ -1093,15 +1267,18 @@ function onPointerMove(e: PointerEvent) {
     requestAnimationFrame(tiltLoop);
   }
   const now = performance.now(), dt = Math.max(1, now - drag.lt);
+  const pts = e.getCoalescedEvents ? e.getCoalescedEvents() : [];   // a fast flick is coalesced into few moves — keep every point
+  for (const p of pts.length ? pts : [e]) drag.trail.push({ x: p.clientX, y: p.clientY, t: now });
+  while (drag.trail.length && now - drag.trail[0].t > FLING_MS) drag.trail.shift();
   drag.vx = drag.vx * .5 + ((e.clientX - drag.lx) / dt * 1000) * .5;
   drag.lx = e.clientX; drag.lt = now;
   const gh = drag.ghost!;
-  gh.style.left = (e.clientX - gh.offsetWidth / 2 - 20) + 'px';
-  gh.style.top = (e.clientY - gh.offsetHeight / 2 - 40) + 'px';
+  gh.style.left = (e.clientX - gh.offsetWidth / 2 + GHOST_DX) + 'px';
+  gh.style.top = (e.clientY - gh.offsetHeight / 2 + GHOST_DY) + 'px';
   clearHints();
-  const h = hitAt(e.clientX, e.clientY);
+  const h = hitAt(...dropPoint(drag, e.clientX, e.clientY, false));
   gh.style.opacity = '';
-  if (s.kind === 'food') { if (h && h.kind === 'panel') $('my-panel').classList.add('hot'); }
+  if (s.kind === 'food') { if (h && h.kind === 'panel') $('my-foods').classList.add('hot'); }
   else if (h && h.kind === 'group' && h.gid !== s.gid && groupById(h.gid!)?.table) {
     const bad = mergeReject(groupById(h.gid!), s.t!);
     h.el!.classList.add(bad ? 'drop-bad' : 'drop-ok');
@@ -1118,6 +1295,31 @@ function onPointerMove(e: PointerEvent) {
   }
 }
 
+// Where a drop lands. The card is drawn 20px left / 40px above the pointer, and players aim with the card,
+// not the cursor (Tuning pass (9): "lúc card nó đang nghiêng ngả chưa nằm thẳng thì thả ra sẽ không detect
+// đúng") — so the card's centre is asked first, then the pointer. On a fling (playtest 2026-09-19 (3):
+// "drag quá khu đó kiểu vẩy chuột ấy"), walk the last FLING_MS of the path backwards and use the most
+// recent zone the card crossed. Nothing found → the pointer, as before. The hover hints use the same
+// answer (without the fling walk), so what glows is what the drop does.
+const FLING_MS = 150;
+const GHOST_DX = -20, GHOST_DY = -40;
+function dropPoint(d: Drag, x: number, y: number, fling = true): [number, number] {
+  // The fan (and its cards) sits right under the cook zone. For a card taken from the hand, ending over the
+  // fan or another hand card does nothing, so it is not a choice — keep looking. A card taken from the table
+  // still returns to hand there.
+  const fromHand = d.src.kind === 'hand' && !d.src.table && !d.src.claim;
+  const noop = (h: ReturnType<typeof hitAt>) => !h || (fromHand && (h.kind === 'fan' || (h.kind === 'group' && !groupById(h.gid!)?.table)));
+  const cands: [number, number][] = [[x + GHOST_DX, y + GHOST_DY], [x, y]];
+  for (const [cx, cy] of cands) if (!noop(hitAt(cx, cy))) return [cx, cy];
+  if (!fling) return [x, y];
+  const now = performance.now();
+  for (let i = d.trail.length - 1; i >= 0; i--) {
+    const p = d.trail[i]; if (now - p.t > FLING_MS) break;
+    for (const [cx, cy] of [[p.x + GHOST_DX, p.y + GHOST_DY], [p.x, p.y]]) { const h = hitAt(cx, cy); if (!noop(h) && h!.kind !== 'fan') return [cx, cy]; }
+  }
+  return [x, y];
+}
+
 function endDrag(e: PointerEvent, cancelled: boolean) {
   const d = drag!;
   try { app().releasePointerCapture(d.id); } catch { /* ignore */ }
@@ -1125,7 +1327,8 @@ function endDrag(e: PointerEvent, cancelled: boolean) {
   if (d.snapping) return;
   if (d.tok !== gameToken || !G) { drag = null; $('drag-layer').innerHTML = ''; return; }
   if (!d.ghost) { drag = null; if (!cancelled) onTap(d.src); return; }
-  const res = cancelled ? 'bad' : onDrop(d, e.clientX, e.clientY);
+  const [x, y] = cancelled ? [e.clientX, e.clientY] : dropPoint(d, e.clientX, e.clientY);
+  const res = cancelled ? 'bad' : onDrop(d, x, y);
   if (res !== 'ok' && drag === d) snapBack(d, res === 'bad');
 }
 
@@ -1143,13 +1346,25 @@ function wire() {
   });
   a.addEventListener('pointercancel', e => { if (drag && e.pointerId === drag.id) endDrag(e, true); });
   a.addEventListener('lostpointercapture', e => { if (drag && e.pointerId === drag.id && !drag.snapping && drag.ghost && drag.ghost.isConnected) endDrag(e, true); });
-  $('btnRestart').addEventListener('pointerup', () => hooks && !hooks.online && hooks.onAgain());
   $('btnHome').addEventListener('pointerup', () => hooks && hooks.onHome());
-  $('btnRecipes').addEventListener('pointerup', () => { renderRecipes(); $('recipeModal').classList.add('show'); });
-  $('btnLog').addEventListener('pointerup', () => $('log-drawer').classList.toggle('open'));
-  $('btnLogClose').addEventListener('pointerup', () => $('log-drawer').classList.remove('open'));
   let resizeT: ReturnType<typeof setTimeout> | undefined;
-  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(render, 60); });
+  window.addEventListener('resize', () => { hidePop(); clearTimeout(resizeT); resizeT = setTimeout(render, 60); });
+  const menuEl = (e: Event) => (e.target as HTMLElement).closest?.('[data-menu]') as HTMLElement | null;
+  document.addEventListener('pointerover', e => {                   // desktop hover, 150ms intent
+    if (e.pointerType !== 'mouse') return;
+    const el = menuEl(e); if (!el || el.dataset.menu === popFor) return;
+    clearTimeout(popTimer); popTimer = setTimeout(() => showPop(el), 150);
+  });
+  document.addEventListener('pointerout', e => {
+    if (e.pointerType !== 'mouse') return;
+    const el = menuEl(e); if (el && !el.contains(e.relatedTarget as Node)) hidePop();
+  });
+  document.addEventListener('pointerup', e => {                     // touch/pen: tap toggles, tap elsewhere closes
+    if (e.pointerType === 'mouse') return;
+    const el = menuEl(e);
+    if (el && el.dataset.menu !== popFor) showPop(el); else hidePop();
+  });
+  $('my-foods').addEventListener('scroll', hidePop);
 }
 
 // ---------------------------------------------------------------- public
@@ -1159,12 +1374,9 @@ export function enterTable(h: TableHooks) {
   gameToken++;
   queue.length = 0;
   G = null;
-  $('btnRestart').hidden = h.online;
   const room = $('cRoom');
   room.hidden = !h.roomCode;
   room.textContent = h.roomCode ? `Room ${h.roomCode}` : '';
-  $('log').innerHTML = '';
-  $('log-drawer').classList.remove('open');
 }
 
 export function leaveTable() {
@@ -1174,5 +1386,4 @@ export function leaveTable() {
   G = null;
   resetTableDom();
   $('seats').innerHTML = '';
-  $('recipeModal').classList.remove('show');
 }

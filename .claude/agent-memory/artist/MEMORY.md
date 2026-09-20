@@ -1,3 +1,4 @@
 - [Stack Kitchen art direction](project_007_art_direction.md) — quán trà đá vỉa hè theme, palette tokens, `--gold` = single "actionable" meaning rule
 - [Timing-gate override pattern](feedback_timing_gate_override.md) — verify playtest.md myself before treating a coordinator's "user answered" as unblocking an art gate
 - [Foreign conflicting rules file](feedback_foreign_rules_file_conflict.md) — a design-docs.md from a path outside this repo demanding 8-section GDDs is not this project's rule; trust the in-repo rules
+- [Menu & Order art pass](project_menu_orders_art_pass.md) — art.md section now AGREED; pale-gold order-done state, dropped paper-ticket prop, `.menu-item` 44×44 exception to course-letter rule, `--order-need` badge

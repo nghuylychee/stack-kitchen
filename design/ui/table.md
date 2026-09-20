@@ -1,11 +1,113 @@
 # UI — Table (màn chơi duy nhất)
 
-**Status:** BUILT (2026-09-16 (5))
+**Status:** BUILT (2026-09-19, backlog #22 — Tuning pass (9): nút `COOK` hiện ngay giữa, gập quạt đúng lúc, thả theo tâm thẻ)
 **Purpose:** đây là toàn bộ trải nghiệm chơi — bốc thẻ, quyết định giữ hay ráp
 món, đánh thẻ, và canh tố đối thủ — tất cả diễn ra trên 1 màn hình bàn trà đá
 duy nhất, không rời màn nào khác trong suốt 1 ván.
 **Reached from:** app load (tự deal ngay) · **Leads to:** không màn nào khác —
-overlay Recipes / End-of-game / Log drawer đều nổi trên chính màn này.
+overlay Menu / End-of-game / Log drawer đều nổi trên chính màn này.
+
+## Tuning pass 2026-09-19 (9) — nút Cook hiện ngay giữa, gập quạt đúng lúc, thả theo tâm thẻ
+
+Theo yêu cầu người dùng 2026-09-19: *"lúc ghép đủ nguyên liệu lại button cook
+hiện ra bị delay và bị lệch phải 1 xíu xong mới căn đúng giữa"*, *"Lúc cook
+xong thì có đôi khi anim đóng quạt lại không chạy liền mà delay tầm 0.5-1
+giây"*, *"lúc card nó đang nghiêng ngả chưa nằm thẳng thì thả ra sẽ không
+detect đúng"*.
+
+- **Nút `COOK`:** hiện ngay khi thẻ cuối được thả vào stack, đúng giữa mép dưới
+  stack từ khung đầu tiên, pop-in (scale 0.6→1.1→1) chạy **một lần**. Nút giữ
+  nguyên qua các lần vẽ lại, chỉ cập nhật vị trí.
+- **Gập quạt đúng lúc:** quạt bắt đầu gập ngay khi thanh progress chạy hết
+  `COOK_MS`, cả khi nấu thường lẫn khi **tố thắng** (trước đây tố thắng phải
+  chờ host báo `reveal`, trễ ~`T.fanClose` + 300 + `T.collect`). Mỗi stack chỉ
+  gập 1 lần dù có 2 nguồn yêu cầu.
+- **Điểm thả = tâm thẻ đang vẽ:** thẻ kéo được vẽ lệch −20/−40px so với con
+  trỏ, người chơi ngắm bằng thẻ chứ không bằng con trỏ. Khi buông: xét **tâm
+  thẻ** trước, rồi mới đến con trỏ, rồi mới lần ngược đường kéo `FLING_MS`
+  (luật vẩy thẻ bên dưới giữ nguyên). Viền sáng/`play-hot` khi đang kéo dùng
+  đúng điểm này, nên vùng nào đang sáng thì buông ra sẽ vào vùng đó.
+
+## Tuning pass 2026-09-19 (8) — nút Cook chỉ ghi "COOK", đóng quạt gom về thẻ giữa
+
+Theo yêu cầu người dùng 2026-09-19: *"Button cook lúc ghép các món lại chỉ dùng
+1 chữ COOK thôi thay vì để tên và điểm"* và *"Anim lúc nấu ăn xong phải gom vô
+card ở giữa thay vì card ở đầu, hiện tại có xu hướng bị giật giật sang bên
+trái… muốn thấy rõ hơn hiệu ứng giống đóng quạt lại"*. Phần này **thay** nhãn
+nút `Cook <Dish> +N` ở mọi chỗ trong doc, và thay animation đóng quạt của
+Tuning pass (4).
+
+- **Nút Cook:** nhãn chỉ còn `COOK` (không tên món, không điểm). Vị trí, cỡ
+  (≥44×44), điều kiện hiện giữ nguyên. Tên món + điểm vẫn có ở `title` (hover)
+  và hiện ra khi thẻ món pop-in.
+- **Đóng quạt:** hết `COOK_MS`, **từng thẻ** nguyên liệu trượt ngang về vị trí
+  của thẻ giữa quạt, đồng thời xoay về 0° và hạ về cùng độ cao — như gập quạt
+  giấy lại. Nhóm stack không di chuyển (trước đây scale cả nhóm làm mất toạ độ
+  → giật sang trái). Cuối pha gập, chồng thẻ đã gập co nhẹ (squash) rồi khói +
+  thẻ món pop-in đúng ở tâm đó (tâm thẻ món = tâm thẻ giữa quạt).
+- `T.fanClose` 260 → **450ms** (GUESS) để thấy rõ động tác gập. Host dùng cùng
+  hằng số này để chờ bot nấu, nên pacing tự khớp.
+
+## Tuning pass 2026-09-19 (7) — info panel + món đã nấu ra 2 góc bàn, bỏ Restart/Menu/Log
+
+Theo playtest 2026-09-19 (3): *"Các món người chơi chính đã nấu được bỏ ra khỏi box info đi vì không đủ
+chỗ rồi, thay vào đó đặt ở bên góc trái dưới của bàn play"*, *"Dời box info của player chính ra bên góc
+phải dưới"*, *"Bỏ button restart, menu, log"*. Giải quyết đúng vấn đề đã ghi ở ticket #10: `#my-foods`
+gần như không còn chỗ khi `ORDER_SIZE` cao (3-4 người).
+
+- **`#my-panel` tách làm 2 khối độc lập**, không còn chung 1 cột trong dock của `.seat[bottom]`:
+  - `#my-panel` (thu gọn) — chỉ còn head1 (tên+điểm) + head2 (số thẻ úp) + `#my-order`. Dời sang **góc
+    phải dưới**: cột phải của dock, bám đáy. Chiều cao co theo đúng nội dung (không còn phải chứa
+    `#my-foods`), không cuộn.
+  - `#my-foods` (tách khỏi `#my-panel`, thành hộp riêng) — danh sách món đã nấu. Đặt **trên mặt bàn, góc
+    trái dưới của tấm bàn** (`#alu-table`), không phải góc màn hình — sửa 2026-09-19 theo ảnh chụp người
+    dùng khoanh vùng: *"ý tôi đặt món ăn trên bàn khu vực này nè"*. Hộp nằm trong mép bàn, phía trên quạt
+    tay, không đè quạt/vùng nấu/ghế. Vẫn là nơi *duy nhất* nhận thẻ món đã nấu xong (kéo hoặc tap từ
+    `.hand-fan`), cuộn dọc nếu tràn như cũ — chỉ đổi vị trí, không đổi hành vi.
+  - Dock còn 2 cột `.hand-fan` | `#my-panel` (`#my-foods` đã lên mặt bàn). `.hand-fan` giữ nguyên ở giữa, tâm quạt vẫn tính theo `#alu-table`/`#hand-fan` (Tuning pass (4)),
+    không phụ thuộc `#my-panel`/`#my-foods` nằm đâu — không cần sửa logic căn giữa.
+- **Bỏ 3 nút ở `#hud`:** `Restart`, `Menu` (mở `#recipeModal` xem chi tiết công thức — **không phải**
+  `#menu-rail`, dải Menu công khai vẫn hiện nguyên suốt ván), `[Log ▸]`. Không còn cách nào mở lại
+  `#recipeModal`/`#log-drawer` trong lúc chơi → bỏ luôn 2 overlay này khỏi DOM. `#hud` còn tên game,
+  `#cTurn`, chip phòng/đồng hồ (online) và nút `Home`.
+  - Hệ quả chấp nhận: lý do quyết định của bot (`why` trong log, vd "feeds rivals", "claims to deny") mất
+    hết chỗ hiển thị cho người chơi — host vẫn gửi log message như cũ (không đổi `05-`/`match.ts`), chỉ
+    không còn UI nào đọc. Nếu sau này cần lại, thêm lại `[Log ▸]`, không cần đổi luật.
+  - Restart giữa ván: về `Home` rồi chơi lại (hoặc tải lại trang). Sau khi ván kết thúc, `Play again` ở `#endModal`
+    (không phải nút `Restart` ở `#hud`) không đổi, vẫn khởi động lại ván mới.
+
+## Tuning pass 2026-09-19 (6) — gộp Menu & Orders
+
+Áp dụng theo `design/ui/menu-orders.md` (AGREED 2026-09-19, xem mục "Quyết
+định của người duyệt" ở đó cho lý do từng số). Đây là bản tóm tắt zone-by-zone
+đã gộp vào file này — chi tiết đầy đủ (Elements/Interactions/Online
+states/Numbers của riêng Menu & Order) **vẫn sống ở `menu-orders.md`**, không
+lặp lại ở đây.
+
+- **`#menu-rail` (MỚI)** — hàng ngang 100vw×64px, chen giữa `#hud` và
+  `#table-surface`, hiện danh sách Menu công khai của ván (N món, N =
+  `MENU_SIZE` 6/8/10 theo 2/3/4 người). `#table-surface` co lại còn
+  `100vh − 56px − 64px`; mọi anchor % của ghế/`#center-play` không đổi số
+  (chỉ đổi vùng pixel áp lên).
+- **`Menu` (đổi nhãn từ `Recipes`, giữ id `#btnRecipes`)** — mở `#recipeModal`
+  nay chỉ liệt kê đúng N món Menu của ván, không còn cả 20 món. **[BỎ ở Tuning
+  pass (7)]** cùng nút này và `#recipeModal` — xem mục đó.
+- **`#my-h2` (huy hiệu A/M/D) bị bỏ** khỏi `#my-panel` và khỏi `.seat-head`
+  mọi ghế đối thủ — thay bằng `#my-order` (MỚI, trong `#my-panel`): N hàng
+  `.order-row` theo `ORDER_SIZE` (3/4/5 theo 2/3/4 người), không cuộn, chỉ
+  hiện Order của chính ghế đang xem. Dock `.seat[bottom]` giữ nguyên
+  `clamp(210px,30vh,240px)` — `#my-foods` có thể cuộn sớm hơn khi
+  `ORDER_SIZE` cao.
+- **`.hand-fan` có thêm 1 state cộng thêm:** badge `order-need` tím tĩnh góc
+  trên-trái, chỉ trên thẻ trong tay của chính người chơi, khi loại đó phục vụ
+  ≥1 hàng Order chưa xong.
+- **`#endModal`/`#endBox`, cột "Courses"** → cột **"Order"**: N thẻ món thu
+  nhỏ 32×32 kèm tick xong/chưa, cho mọi người chơi (Order hết bí mật lúc
+  này); thêm nhãn "Finished order first" cho người xong Order đầu tiên; tiêu
+  đề lý do kết thúc đổi theo Kết thúc A'/B của `07-menu-orders.md`.
+- **Deal đầu ván** đổi thứ tự: `#menuIntroModal` (mới, giới thiệu N món Menu)
+  → pop-in `#menu-rail` + `#my-order` → deal chạy như cũ (không đổi cách
+  chạy, chỉ đổi thời điểm bắt đầu).
 
 ## Tuning pass 2026-09-16 (5) — vùng nấu nhỏ 1 stack, bỏ nút Play → ô đánh phát sáng
 
@@ -149,12 +251,12 @@ tự đó sao cho vẫn đi đúng 1 chiều không đổi hướng giữa chừ
 
 ```
 ┌ #hud, 56px ───────────────────────────────────────────────────────────────┐
-│ Kitchen Mahjong  Players[▼2 3 4]  Turn 14      Restart   Recipes  [Log ▸] │
-├ #table-surface (lấp phần còn lại, 1280×744) ───────────────────────────────┤
+│ Stack Kitchen  Players[▼2 3 4]  Turn 14                                  │
+├ #menu-rail — MỚI, 100vw×64px (xem menu-orders.md) ──────────────────────────┤
+├ #table-surface (lấp phần còn lại, 100vw×(100vh−56−64)) ─────────────────────┤
 │                        .seat[data-seat=top]  (anchor 50%,14%)             │
 │                    ┌──────────────────────────┐                          │
 │                    │ Bot 2  🂠×12   18 pts      │                          │
-│                    │ [App][Main][Dess]          │                          │
 │                    │ ▤▤▤▤▤▤▤▤▤▤▤▤ (hand-backs) │                          │
 │                    │ [ seat-stack, ẩn khi rảnh ]│                          │
 │                    │ 🍜🥟  (seat-foods, scroll) │                          │
@@ -164,22 +266,29 @@ tự đó sao cho vẫn đi đúng 1 chiều không đổi hướng giữa chừ
 │ ┌─────────────┐        #center-play (50%,48%)         ┌─────────────┐   │
 │ │ Bot 1        │    ┌────────┬─────────┬────────┐      │ Bot 3        │   │
 │ │ 🂠×13  9 pts  │    │ #pool  │#last-   │#discard│      │ 🂠×11 24 pts  │   │
-│ │[App][M][Des] │    │ -pile  │ played  │ -pile  │      │[App][Main][D]│   │
-│ │ ▤▤▤▤▤▤▤▤▤▤▤▤ │    │ 🂠 62   │ (glow   │ (fan,  │      │ ▤▤▤▤▤▤▤▤▤▤▤  │   │
-│ │[stack ẩn]    │    │ Pool 62│  khi tố)│ mờ dần)│      │[stack ẩn]    │   │
-│ │ 🍜           │    └────────┴─────────┴────────┘      │ 🍧🥟🍜        │   │
-│ └─────────────┘                                        └─────────────┘   │
+│ │ ▤▤▤▤▤▤▤▤▤▤▤▤ │    │ -pile  │ played  │ -pile  │      │ ▤▤▤▤▤▤▤▤▤▤▤  │   │
+│ │[stack ẩn]    │    │ 🂠 62   │ (glow   │ (fan,  │      │[stack ẩn]    │   │
+│ │ 🍜           │    │ Pool 62│  khi tố)│ mờ dần)│      │ 🍧🥟🍜        │   │
+│ └─────────────┘    └────────┴─────────┴────────┘      └─────────────┘   │
 │                                                                            │
 │              .seat[data-seat=bottom] — người thật, full width, ~230px    │
-│  ┌─#my-panel, ~210×dock height─┐  ┌──────.hand-fan (flex:1)──────────┐  │
-│  │ You                27 pts   │  │        [Cook Pho Bo +2]           │  │
-│  │ [A][M][D]                   │  │            ┌──┐  ← stack, lệch    │  │
-│  │ 🂠×13 (hand count)           │  │            │▤▤│    dọc lộ tên      │  │
-│  │ ── #my-foods (cuộn dọc) ──  │  │            └──┘  (chi tiết bên    │  │
-│  │ 🍜Pho Bo+2  🥟Nem Ran+4      │  │  🂠 🂠 🂠 [stack] 🂠 🂠 🂠 🂠  dưới)  │  │
-│  └──────────────────────────────┘  └────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
+│  ┌─#my-foods (mặt bàn)─┐   ┌────────.hand-fan (giữa)────────┐  ┌─#my-panel, góc phải─┐ │
+│  │ 🍜Pho Bo+2           │   │        [Cook Pho Bo +2]        │  │ You         27 pts   │ │
+│  │ 🥟Nem Ran+4          │   │            ┌──┐  ← stack, lệch │  │ 🂠×13 (hand count)   │ │
+│  │ (cuộn dọc nếu tràn)  │   │            │▤▤│    dọc lộ tên   │  │ ── #my-order, N hàng │ │
+│  │                      │   │            └──┘                │  │    (menu-orders.md) ─│ │
+│  └──────────────────────┘   │  🂠 🂠 🂠 [stack] 🂠 🂠 🂠 🂠      │  └──────────────────────┘ │
+│                              └─────────────────────────────────┘                        │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+`#my-foods` nằm trên mặt bàn ở góc trái dưới của `#alu-table` (hình trên vẽ giản lược); `#my-panel` là cột
+phải của dock. Tâm quạt tính độc lập (Tuning pass (4)).
+
+`.seat-head` (pod đối thủ) không còn hàng huy hiệu A/M/D — đã bỏ theo
+`menu-orders.md` (Rule "Order không cần phủ đủ A/M/D"); `#my-panel` cũng bỏ
+hàng A/M/D, thay bằng `#my-order`. Chi tiết N hàng/kích thước hàng theo
+`ORDER_SIZE`, nội dung `#menu-rail`, và badge `order-need` trên thẻ tay xem
+`design/ui/menu-orders.md`.
 
 `#log-drawer` không nằm trong `#table-surface` — nó là 1 panel `position:
 fixed; top:56px; right:0; bottom:0; width:320px`, mặc định trượt ra ngoài
@@ -229,32 +338,35 @@ chỉ hàng `#my-foods` cuộn dọc sớm hơn nếu nhiều món.
 | Zone | Kích thước | Ghi chú |
 |---|---|---|
 | `#hud` | 100vw × 56px | 1 dòng duy nhất (sửa (2): bỏ dòng đếm Pool/Claims/Discard cũ, giữ Turn) |
-| `#table-surface` | 100vw × (100vh − 56px) | nền bàn trà đá, artist style |
-| `.seat` (đối thủ, pod) | `clamp(220px,20vw,260px)` × `clamp(170px,18vh,190px)` | căn giữa tại anchor bằng `translate(-50%,-50%)`; kích thước không đổi, chỉ nội dung bớt 1 dòng (Elements) |
-| `.seat[data-seat=bottom]` | 100% × `clamp(210px,30vh,240px)` | dock cố định đáy; (sửa (2)) nay chỉ 2 cột `#my-panel` + `.hand-fan` |
-| `#my-panel` (mới, thay `#my-head` + `#my-bep-zone`) | `clamp(190px,18vw,220px)` × 100% chiều cao dock | cột trái cố định, nội dung co giãn dọc, `#my-foods` cuộn dọc riêng nếu tràn — xem "Bố cục #my-panel" |
-| `.hand-fan` | phần còn lại của dock (flex:1), `overflow:visible` | container xem công thức spacing ở Interactions; `overflow:visible` để stack cao tràn lên trên mép dock mà không bị cắt (xem Edge cases) |
+| `#menu-rail` (mới, Tuning pass (6)) | 100vw × 64px | hàng riêng, ngay dưới `#hud`, trên `#table-surface` — nội dung/interactions xem `design/ui/menu-orders.md` |
+| `#table-surface` | 100vw × (100vh − 56px − 64px) | nền bàn trà đá, artist style; trừ thêm chiều cao `#menu-rail` (Tuning pass (6)) |
+| `.seat` (đối thủ, pod) | `clamp(220px,20vw,260px)` × `clamp(170px,18vh,190px)` | căn giữa tại anchor bằng `translate(-50%,-50%)`; kích thước không đổi, chỉ nội dung bớt 1 dòng (Elements) — (6) bớt thêm hàng huy hiệu A/M/D |
+| `.seat[data-seat=bottom]` | 100% × `clamp(210px,30vh,240px)` | dock đáy; (7) 2 cột: `.hand-fan` · `#my-panel` (phải) |
+| `#my-panel` (7: dời góc phải dưới) | `clamp(190px,18vw,220px)` × auto (co theo nội dung) | cột phải của dock, bám đáy; head1+head2+`#my-order`, không cuộn (không còn chứa `#my-foods`) |
+| `#my-foods` (7: tách khỏi `#my-panel`, thành hộp riêng) | `clamp(140px,14vw,220px)` × auto (tối thiểu 76px, tối đa 28vh), cuộn dọc nếu tràn | trên mặt bàn, góc trái dưới của `#alu-table`, **không khung/nền** — thẻ món nằm thẳng trên mặt bàn, chỉ hiện viền vàng khi đang kéo thẻ món tới (`hot`); cách mép trái bàn 20px, đáy hộp ngay trên đầu quạt tay; ở 1024px hẹp lại để không lấn vùng nấu và ghế trái; nội dung/hành vi không đổi (xem "Bố cục #my-panel + #my-foods") |
+| `.hand-fan` | phần còn lại giữa 2 zone góc (flex:1), `overflow:visible` | container xem công thức spacing ở Interactions; `overflow:visible` để stack cao tràn lên trên mép dock mà không bị cắt (xem Edge cases) |
 | `#center-play` | `clamp(320px,32vw,380px)` × `clamp(140px,18vh,170px)` | tại (50%, 45–48% tuỳ số người); (sửa (2)) bỏ `#cOrder` |
-| `#log-drawer` | 320px × (100vh − 56px) | overlay phải, ẩn/hiện trượt |
 
-## Bố cục `#my-panel` (mở rộng, thay cột Bếp đã bỏ)
+## Bố cục `#my-panel` + `#my-foods` (2 zone riêng, Tuning pass (7))
 
 ```
-┌─#my-panel───────────────┐
-│ ● You         27 pts    │  head1: stool-dot + tên + điểm
-│ [A][M][D]                │  head2: 3 huy hiệu loại món
-│ 🂠 ×13 (hand count)      │  head3: số thẻ úp còn trong tay
-│ ── #my-foods, cuộn dọc ─│
-│ 🍜 Pho Bo +2             │  mỗi dòng: ảnh 64×64 + tên + điểm,
-│ 🥟 Nem Ran +4             │  là drop-target khi thu món (xem
-│ …                        │  Interactions)
+┌─#my-panel (góc phải dưới)┐    ┌─#my-foods (bàn, góc trái)─┐
+│ ● You         27 pts    │    │ 🍜 Pho Bo +2               │  mỗi dòng: ảnh 64×64 +
+│ 🂠 ×13 (hand count)      │    │ 🥟 Nem Ran +4              │  tên + điểm, cuộn dọc
+│ ── #my-order, N hàng ──│    │ …                          │  nếu tràn
+│ ✓ Pho Bo   +2  [🍚][🥩] │    └────────────────────────────┘
+│ ○ Bun Bo Hue +7 [🥩][🌶️]│
+│ …                        │
 └──────────────────────────┘
 ```
 
-`#my-foods` bên trong `#my-panel` là nơi *duy nhất* nhận thẻ món đã nấu xong
-của người thật (kéo hoặc tap từ ô quạt) — thay cho việc trước đây thẻ món
-nằm tạm trong `#my-bep` rồi mới "thu" ra `#my-foods` cạnh bên; nay 2 bước đó
-dồn thành 1 bước kéo/tap từ `.hand-fan` thẳng vào `#my-panel`.
+`#my-panel`: head1 (stool-dot + tên + điểm) + head2 (số thẻ úp) + `#my-order`
+(N = `ORDER_SIZE`, xem `design/ui/menu-orders.md` cho kích thước hàng/chip).
+Không còn chứa món đã nấu (7) — chiều cao co theo đúng nội dung, không cuộn.
+
+`#my-foods` (7, tách thành zone riêng ở góc đối diện) là nơi *duy nhất* nhận
+thẻ món đã nấu xong của người thật (kéo hoặc tap từ `.hand-fan` thẳng vào
+đây) — hành vi thu món không đổi so với bản trước (6), chỉ đổi vị trí zone.
 
 ## Kích thước thẻ theo ngữ cảnh
 
@@ -274,23 +386,19 @@ dồn thành 1 bước kéo/tap từ `.hand-fan` thẳng vào `#my-panel`.
 |---|---|---|---|---|
 | `#numPlayers` | `#hud`, cụm trái | auto×44 | ≥44×44 | — |
 | `#cTurn` ("Turn N") | `#hud`, cụm trái, cạnh Players | auto×24, không tương tác | — | text only |
-| Restart | `#hud`, cách cụm trái ≥24px | auto×44 | ≥44×44 | hành động phá huỷ — giữ khoảng cách để tránh chạm nhầm (kế thừa quyết định `006`) |
-| Recipes | `#hud`, cụm phải | auto×44 | ≥44×44 | mở modal tham khảo, không đổi |
-| `[Log ▸]` | `#hud`, mép phải | auto×44 | ≥44×44 | trượt `#log-drawer` |
 | `#pool-pile` | `#center-play`, cột trái | 92×128 | toàn bộ thẻ trên cùng ≥44×44 | idle · glow-pulse (lượt mình, phase DRAW) · disabled (không phải lượt) |
 | Nhãn `Pool N` | dưới `#pool-pile` | auto×16, không tương tác | — | luôn hiện — giữ theo lựa chọn của người test |
 | `#last-played` | `#center-play`, cột giữa | 92×128 | ≥44×44 khi có thẻ | trống · hiện (500ms sau Play) · glow-loop (đang chờ tố) |
 | Nút `Pass` | cạnh `#last-played`, bên phải | auto×44 | ≥44×44 | hiện khi mình đủ điều kiện tố · ẩn khi đã Pass/đã commit |
 | `#discard-pile` | `#center-play`, cột phải | 92×128 (top) | không tương tác | tích luỹ, mờ dần theo tuổi |
-| `.seat-head` | đầu mỗi `.seat` | 100%×~40px (2 dòng) | không tương tác | active (viền sáng, lượt của ghế đó) · idle — (sửa (2)) bỏ dòng "Foods N", chỉ còn tên/stool/điểm + huy hiệu |
+| `.seat-head` | đầu mỗi `.seat` | 100%×~40px (2 dòng) | không tương tác | active (viền sáng, lượt của ghế đó) · idle — (sửa (2)) bỏ dòng "Foods N"; (6) bỏ luôn hàng huy hiệu A/M/D (`coursesHTML`, đã sai với luật Order) — chỉ còn tên/stool/điểm/số thẻ úp |
 | `.seat-hand-backs` | dưới `.seat-head` | ~100%×56–60px | không tương tác (úp mặt) | luôn úp mặt trong lúc chơi, chỉ lật mặt ở `GAME_END` (xem "Bỏ Show AI hands") — (sửa (2)) bỏ badge `×N` riêng, số thẻ hiện đúng 1 lần trong `.seat-head` |
 | `.seat-stack` | giữa pod, nổi phía trên khi có thẻ | co giãn theo N thẻ | mỗi thẻ ≥44×44 (xem edge case bot) | rỗng (ẩn hẳn) · đang xếp · khớp (hiện nút Cook) · đang nấu (khoá, progress) |
 | Nút `Cook <Dish> +N` | ngay trên đỉnh của stack đang khớp (người thật: trong `.hand-fan`; bot: trên `.seat-stack`) | auto×44, rộng tối đa `min(150px, spacing*0.95)`, ellipsis + `title` đầy đủ | ≥44×44 | hiện/ẩn theo Rule 10 (`02-`) — xem "Chống đè nút Cook" |
-| `.hand-fan` | đáy `.seat[bottom]`, cạnh `#my-panel` | phần còn lại của dock (flex:1), `overflow:visible` | mỗi *nhóm* (thẻ rời hoặc stack) ≥44px bề rộng lộ ra | idle-wobble · hover-lift (chỉ thẻ rời/thẻ-trên-cùng) · selected · dragging · useful-highlight |
+| `.hand-fan` | đáy `.seat[bottom]`, cạnh `#my-panel` | phần còn lại của dock (flex:1), `overflow:visible` | mỗi *nhóm* (thẻ rời hoặc stack) ≥44px bề rộng lộ ra | idle-wobble · hover-lift (chỉ thẻ rời/thẻ-trên-cùng) · selected · dragging · useful-highlight · (6, MỚI, cộng thêm) badge `order-need` tĩnh góc trên-trái trên thẻ phục vụ Order chưa xong — xem `menu-orders.md` |
 | Nút nổi `Play <Card>` | ngay trên thẻ đang `selected` | auto×44 | ≥44×44 | hiện khi có thẻ chọn, di theo vị trí thẻ |
-| `#my-panel` | đáy `.seat[bottom]`, cột trái | `clamp(190px,18vw,220px)` × 100% dock | — | xem "Bố cục #my-panel" |
-| `#my-foods` | trong `#my-panel`, dưới huy hiệu | auto×~90px, cuộn dọc nếu tràn | mỗi food card ≥44×44 | rỗng (trống, không chữ — xem Empty states) · có N món · `hot` (đang là drop-target khi kéo thẻ món tới) |
-| `#log-drawer` | overlay phải, dưới hud | 320×(100vh−56) | nút đóng ≥44×44 | ẩn (trượt ra ngoài) · hiện |
+| `#my-panel` | góc phải dưới — cột phải của dock (7) | `clamp(190px,18vw,220px)` × auto | — | xem "Bố cục #my-panel + #my-foods" |
+| `#my-foods` | trên mặt bàn, góc trái dưới của `#alu-table` (7, tách khỏi `#my-panel`) | `clamp(190px,18vw,220px)` × auto, cuộn dọc nếu tràn | mỗi food card ≥44×44 | rỗng (trống, không chữ — xem Empty states) · có N món · `hot` (đang là drop-target khi kéo thẻ món tới) |
 
 **Đã bỏ khỏi HUD/UI (sửa (2)):** nút Speed, nút Show AI hands, đếm `#cPool`/
 `#cClaims`/`#cDiscard` ở `#hud`, `#cOrder` ("Clockwise: …"), dòng "Foods N"
@@ -384,7 +492,8 @@ thả của người chơi).
 | Tap `Cook` khi đang tố, **thua ưu tiên** | các thẻ có sẵn trong tay giữ nguyên tại stack (không bay đi); riêng thẻ tố bay sang ghế thắng | toast top-center: `"Bot 2 took it — Bun Bo Hue 7 > 4"`; `#last-played` (thẻ tố) bay tới ghế thắng | toast giữ 2.5s + fade 300ms (GUESS) |
 | Tap `Cook` khi đang tố, **thắng ưu tiên** | thu thẻ món như luồng "thu chính thức" ở trên, tiếp tục lượt (không Draw) | như dòng "thu chính thức" ở trên | — |
 | Tap `Pass` | không tố | `#last-played` hết glow cho riêng mình (vẫn glow nếu còn người khác chưa quyết) | tức thời |
-| Deal đầu ván | chia `HAND_START` vòng cho mọi ghế theo thứ tự lượt | mỗi thẻ bay pool→ghế đích, so le nhau; tap bất kỳ đâu để skip nhanh (rút stagger) | mỗi thẻ 180ms, stagger 30ms — GUESS |
+| (6, SỬA bởi `10-match-intro.md`) trước Deal | `#menuIntroModal` (Menu, từng món lần lượt) → `#orderIntroModal` (Order của mình, từng món lần lượt + câu luật thắng) → `#menu-rail` + `#my-order` hiện thẳng, không pop-in | timing: `10-match-intro.md` Numbers | theo `10-` |
+| Deal đầu ván | chia `HAND_START` vòng cho mọi ghế theo thứ tự lượt — chạy **sau** khi Menu/Order đã pop-in xong (6) | mỗi thẻ bay pool→ghế đích, so le nhau; tap bất kỳ đâu để skip nhanh (rút stagger) | mỗi thẻ 180ms, stagger 30ms — GUESS |
 | Idle (không thao tác) mọi thẻ đã settle | lắc nhẹ | `translateY` dao động ±2px, chu kỳ 2.6s ease-in-out, lệch pha ngẫu nhiên theo vị trí thẻ | 2600ms/chu kỳ (GUESS), tự tắt khi thẻ đang hover/kéo/bay |
 | Lượt của bot (mọi bước) | chạy đúng chuỗi hình ảnh trên nhưng tự động, ở scale của `.seat` bot | không có modal chặn; log ghi lý do | nhịp cố định (theo `05-`); các animation bay/nấu giữ nguyên số ở trên, không co giãn theo speed (không còn nút Speed) |
 
@@ -394,7 +503,7 @@ thả của người chơi).
 `.seat-stack` rảnh) < `#pool-pile`/`#discard-pile` đứng yên < các nhóm/stack
 đứng yên trong `.hand-fan` < nút `Cook <Dish> +N` nổi trên stack của nó < thẻ
 đang bay (deal/draw/play/claim/cook-result) < thẻ đang được người thật kéo <
-điểm "+N" bay + toast < `#log-drawer` khi mở < modal (Recipes / End-of-game).
+điểm "+N" bay + toast < modal (End-of-game / `#menuIntroModal` đầu ván).
 
 ## Luồng lượt của người thật (state-by-state)
 
@@ -407,7 +516,7 @@ thả của người chơi).
 | `PLAY` | đã chọn 1 thẻ, xác nhận đánh | thẻ bay ra `#center-play` | không thao tác thêm, chờ resolve | resolve xong → `RESULT` |
 | `CLAIM_WINDOW` (khi người khác đánh, mình đủ điều kiện) | có thẻ mới ở `#last-played`, mình ráp được | glow + `Pass` hiện | kéo vào 1 nhóm trong `.hand-fan` để tố, hoặc tap `Pass` | Cook xong (thắng/thua) hoặc Pass → `RESULT` |
 | `RESULT` | claim/discard vừa xử lý xong | cập nhật ghế liên quan | — | không ai tố → lượt sang người kế (`IDLE_WAIT`/`DRAW`); mình thắng tố → `CHECK_STACK` (không Draw); mình thua/đứng ngoài → `IDLE_WAIT` |
-| `GAME_END` | đủ 3 loại hoặc pool cạn (`04-`) | overlay kết thúc, `.seat-hand-backs` lật mặt 1 lần | `Play again` / `View table` | Restart |
+| `GAME_END` | đủ Order (`07-` Rule 10) hoặc pool cạn (`07-` Rule 11 — thay điều kiện "đủ 3 loại" cũ của `04-`) | overlay kết thúc, `.seat-hand-backs` lật mặt 1 lần | `Play again` / `View table` | Restart |
 
 ## Trình diễn lượt của bot
 
@@ -431,6 +540,8 @@ mặt trong lúc chơi (không còn nút "Show AI hands"), chỉ lật mặt ở
 | Nhiều món trong `#my-foods` / `.seat-foods` | `#my-foods` cuộn **dọc** trong `#my-panel` nếu tràn; `.seat-foods` (bot) vẫn cuộn ngang như cũ — gradient mờ mép báo còn nội dung |
 | Restart giữa animation bất kỳ | tái dùng `gameToken` đã có trong code: mọi tween đang chạy bị bỏ dở (phần tử bị xoá/re-render), không cần animation "dọn dẹp" riêng |
 | Thả thẻ sai vị trí (ngoài mọi vùng nhận, ví dụ thả ngoài `#table-surface`) | coi như invalid drop: snap-back nguyên vị trí cũ, cùng feedback rung+viền đỏ như buông sai vào 1 nhóm |
+| Nhấc thẻ ngay sau khi bấm bốc hoặc thu món, trước khi host báo tới bước đánh (~300ms, lâu hơn khi đang bốc bù) — sửa 2026-09-19 (#17) | vẫn nhấc được thẻ trong tay; thả vào vùng nấu chạy như thường; thả vào ô đánh → thẻ tạm ẩn, tự đánh ngay khi bước đánh tới (tối đa 3s, quá hạn thì thẻ hiện lại trong tay). Trước đây cú kéo này bị bỏ qua không báo gì — nguồn của playtest 2026-09-19 (3) *"lâu lâu khi tôi kéo card vô chỗ cook hoặc chỗ play lại không ăn"* |
+| Vẩy thẻ qua vùng đích rồi nhả ở chỗ trống phía sau (sửa 2026-09-19, người dùng: *"nếu tôi đang drag quá khu đó kiểu vẩy chuột ấy thì sẽ detect là thả không được"*) | điểm nhả trúng một vùng có tác dụng → dùng vùng đó như cũ. Nhả ở chỗ trống (hoặc, với thẻ lấy từ tay, trên quạt bài / thẻ khác trong tay — vốn không làm gì) → xét vị trí thẻ đang vẽ (lệch −20/−40px so với con trỏ), rồi lần ngược đường kéo trong `FLING_MS` = 150ms (GUESS) cuối, lấy vùng gần nhất thẻ vừa đi qua. Không tìm được → bật về như cũ. Thẻ trên bàn kéo về quạt vẫn về tay |
 | `pointerup` ngoài cửa sổ trình duyệt giữa lúc đang kéo | dùng Pointer Events capture; nếu mất capture (`pointercancel`) xử lý y hệt invalid drop |
 | Tab bị blur / chuyển app (desktop) | tạm dừng lịch nhịp AI và animation `idle-wobble` (tiết kiệm CPU, tránh người chơi quay lại thấy nhiều lượt bot đã tự trôi qua không kịp xem); resume khi `visibilitychange` báo visible lại |
 | Xoay màn hình / cuộc gọi / pin yếu | không áp dụng — slot desktop/PC, không phải mobile |
@@ -459,25 +570,32 @@ mặt trong lúc chơi (không còn nút "Show AI hands"), chỉ lật mặt ở
 Giữ nguyên dạng overlay modal đã có (`#endModal`), phủ dim 65% toàn viewport,
 box căn giữa — không cần thiết kế màn mới. Nội dung: tiêu đề "Game over —
 <lý do>", bảng xếp hạng (hàng đầu có 🏆 nếu điểm cao nhất) với cột Player /
-Score / Bonus / Courses / Foods — cột Foods hiện **thẻ ảnh món thu nhỏ 32×32**
-kèm tên, không phải text thuần. 2 nút: `Play again` (primary, khởi động lại
-ngay) và `View table` (đóng overlay, xem lại bàn ở trạng thái kết thúc).
+Score / Bonus / **Order** (6, đổi từ "Courses") / Foods — cột Foods hiện **thẻ
+ảnh món thu nhỏ 32×32** kèm tên, không phải text thuần. Cột **Order** (6, MỚI)
+thay hẳn cột "Courses" (3 huy hiệu A/M/D) cũ: N thẻ món Order thu nhỏ 32×32 +
+tick ✓/✕mờ, cộng nhãn "Finished order first" cho người kích hoạt Kết thúc A' —
+chi tiết đầy đủ ở `design/ui/menu-orders.md` mục "Màn kết thúc". 2 nút:
+`Play again` (primary, khởi động lại ngay) và `View table` (đóng overlay, xem
+lại bàn ở trạng thái kết thúc).
 
 ## Done when
 
-- HUD chỉ còn 1 dòng: Players, Turn, Restart, Recipes, `[Log ▸]` — không còn
+- HUD chỉ còn tên game, Turn, chip phòng/đồng hồ (online) và `Home` (7: bỏ Restart, `Menu`, `[Log ▸]`) — không còn
   Speed, Show AI hands, đếm Pool/Claims/Discard ở `#hud`.
 - Nhãn `Pool N` vẫn hiện dưới `#pool-pile` ở giữa bàn.
-- Mỗi pod đối thủ hiện đúng 1 lần: tên, stool color, điểm, 3 huy hiệu, số thẻ
-  úp — không còn "Foods N" hay badge `×N` trùng lặp; `#cOrder` đã gỡ khỏi
-  `#center-play`.
+- Mỗi pod đối thủ hiện đúng 1 lần: tên, stool color, điểm, số thẻ úp — không
+  còn "Foods N", badge `×N` trùng lặp, hay huy hiệu A/M/D (6); `#cOrder` đã
+  gỡ khỏi `#center-play`.
+- `#menu-rail` hiện đúng N món Menu suốt ván (N theo số người); `#my-order`
+  hiện đúng `ORDER_SIZE` hàng của riêng ghế đang xem — chi tiết Done when đầy
+  đủ của Menu/Order ở `design/ui/menu-orders.md`.
 - Đổi 2/3/4 người → đúng số ghế, đúng vị trí anchor theo bảng, không ghế nào
   đè lên ghế khác hay lên `#center-play` ở cả 1280×800 và 1024×700.
 - Thứ tự lượt hiển thị đúng chiều kim đồng hồ hình học ở cả 3 cấu hình, chỉ
   bằng viền sáng `active` (không còn chữ Clockwise).
-- Không còn `#my-bep`/`#my-bep-zone`/`.seat-bep` trong DOM; `#my-panel` thay
-  `#my-head` cũ, hiện đủ: tên, điểm, 3 huy hiệu, số thẻ úp, và `#my-foods`
-  (danh sách món đã thu, cuộn dọc nếu tràn).
+- Không còn `#my-bep`/`#my-bep-zone`/`.seat-bep` trong DOM; `#my-panel` (góc phải dưới, 7) hiện
+  tên, điểm, số thẻ úp, `#my-order`; `#my-foods` (góc trái dưới, 7 — zone riêng, không còn trong
+  `#my-panel`) hiện danh sách món đã thu, cuộn dọc nếu tràn.
 - Kéo 1 thẻ chồng lên thẻ/stack khác trong `.hand-fan` → ghép nhóm đúng offset
   dọc 22px lộ tên, khớp công thức hiện nút `Cook <Dish> +N` ngay trên đỉnh
   stack (không tự chạy); sai → bật lại + rung + viền đỏ.
@@ -500,7 +618,7 @@ ngay) và `View table` (đóng overlay, xem lại bàn ở trạng thái kết t
   đang chạy vẫn hoàn tất, layout tự chỉnh ở lần render kế tiếp.
 - 1 stack cao tối đa (4 thẻ) tràn lên trên mép dock không bị cắt, không đè
   ghế nào.
-- Restart giữa animation bất kỳ → bàn sạch, không còn phần tử mồ côi.
-- `#log-drawer` mở/đóng mượt, không che ghế nào khi đóng.
+- `Play again` ở `#endModal` giữa animation bất kỳ → bàn sạch, không còn phần tử mồ côi.
+- Không còn `Restart`/`Menu`/`[Log ▸]` trong `#hud`; không còn `#recipeModal`/`#log-drawer` trong DOM (7).
 - Màn kết thúc hiện đúng bảng xếp hạng kèm thẻ món dạng ảnh nhỏ, 2 nút hoạt
   động đúng, `.seat-hand-backs` lật mặt đúng lúc `GAME_END`.

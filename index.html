@@ -10,7 +10,7 @@
 <div id="home" class="screen">
   <div class="home-box">
     <h1 class="logo">Stack Kitchen</h1>
-    <p class="tag">Draw, stack and claim ingredients — first to cook Appetizer + Main + Dessert ends the game.</p>
+    <p class="tag">Draw, stack and claim ingredients — finish your secret order of dishes from the menu first.</p>
     <label class="field">Your name <input id="nick" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Chef"></label>
 
     <section class="mode">
@@ -60,13 +60,10 @@
     <span class="chip">Turn <b id="cTurn">0</b></span>
     <span class="chip" id="cRoom" hidden></span>
     <span class="chip timer" id="cTimer" hidden></span>
-    <span class="gap24"></span>
-    <button id="btnRestart">Restart</button>
     <span class="spacer"></span>
-    <button id="btnRecipes">Recipes</button>
-    <button id="btnLog">Log ▸</button>
     <button id="btnHome">Home</button>
   </div>
+  <div id="menu-rail"></div>
 
   <div id="table-surface">
     <div id="alu-table"></div>
@@ -84,24 +81,24 @@
       <div class="slot" id="discard-slot"></div>
     </div>
     <div id="prep"></div>
+    <div id="my-foods"></div>
     <div id="dock">
+      <div class="hand-fan" id="hand-fan"><div class="fan-ui" id="fan-ui"></div></div>
       <div id="my-panel">
         <div class="head1 prow" id="my-h1"></div>
-        <div class="head2 prow" id="my-h2"></div>
-        <div class="head2 prow" id="my-h3"></div>
-        <div id="my-foods"></div>
+        <div id="my-order"></div>
       </div>
-      <div class="hand-fan" id="hand-fan"><div class="fan-ui" id="fan-ui"></div></div>
     </div>
   </div>
 
   <div id="fx"></div>
   <div id="drag-layer"></div>
-  <div id="log-drawer"><div class="top"><span>Action log</span><button id="btnLogClose">✕</button></div><div id="log"></div></div>
 </div>
 
 <div id="toast"></div>
-<div class="modal" id="recipeModal"><div class="box" id="recipeBox"></div></div>
+<div id="recipe-pop" hidden></div>
+<div class="modal intro" id="menuIntroModal"><div class="box" id="menuIntroBox"></div></div>
+<div class="modal intro" id="orderIntroModal"><div class="box" id="orderIntroBox"></div></div>
 <div class="modal" id="endModal"><div class="box" id="endBox"></div></div>
 <div class="modal" id="noticeModal"><div class="box" id="noticeBox"></div></div>
 

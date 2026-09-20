@@ -1,7 +1,7 @@
 # Stack Kitchen — Core
 
-**Status:** DRAFT
-**Last updated:** 2026-09-16 (5) (vùng nấu nhỏ giữa bàn, 1 stack; bỏ chạm chọn + nút Play, chỉ kéo vào ô đánh phát sáng)
+**Status:** BUILT (2026-09-19, backlog #9–#11 — Menu & Order)
+**Last updated:** 2026-09-19 (Core loop + Win/lose viết lại theo Menu/Order, `07-menu-orders.md`; trước đó 2026-09-16 (5) vùng nấu nhỏ giữa bàn, 1 stack; bỏ chạm chọn + nút Play, chỉ kéo vào ô đánh phát sáng)
 **Viewport:** responsive — lấp đầy cửa sổ trình duyệt (mang theo từ 006)
 **Nguồn:** migrate từ `006-stack-kitchen` — chỉ giữ 27 thẻ nguyên liệu + 20 món
 ăn Việt Nam và ảnh của chúng. Bỏ hết shop, khách hàng, nấu theo thời gian,
@@ -11,31 +11,39 @@ level, bàn tự do. Bamboo Mold không được mang sang (không món nào c�
 
 Card game 2–4 người kiểu mạt chược: mỗi lượt bốc 1 thẻ nguyên liệu, quyết định
 ráp món ngay hay giữ bài đánh lớn, rồi đánh 1 thẻ ra — và đối thủ có thể "tố"
-ăn chính thẻ đó để ra món trước bạn.
+ăn chính thẻ đó để ra món trước bạn. Mỗi ván có 1 **Menu** công khai (vài món
+rút từ 20 món gốc) và 1 **Order** bí mật riêng từng người rút từ Menu đó —
+thắng bằng cách hoàn thành Order của mình trước người khác, hoặc ghi nhiều
+điểm hơn dù không về đích đầu → `07-menu-orders.md`.
 
 ## Core loop
 
 | Scale | The loop |
 |---|---|
 | **30 seconds** | bốc 1 thẻ → xem tay có ráp được món nào → reveal hoặc giữ → đánh 1 thẻ ra → canh xem ai tố |
-| **Một ván (~5–10 phút)** | gom đủ 3 loại món (Appetizer · Main · Dessert) trước người khác, hoặc ghi nhiều điểm hơn dù không về đích đầu |
-| **Ngày mai** | thử lại hướng build khác (săn món 4 thẻ điểm cao vs. chốt nhanh món 2 thẻ), đọc bài đối thủ tốt hơn |
+| **Một ván (~5–10 phút)** | hoàn thành hết Order riêng của mình (vài món bí mật rút từ Menu công khai của ván) trước người khác, hoặc ghi nhiều điểm hơn dù không về đích đầu → `07-menu-orders.md` |
+| **Ngày mai** | thử lại hướng build khác (săn món 4 thẻ điểm cao vs. chốt nhanh món 2 thẻ), đọc bài + đoán Order đối thủ tốt hơn |
 
 ## MDA — core loop
 
 **Mechanics**
 
 - Bộ bài chung (pool): 27 loại nguyên liệu × 4 bản = 108 thẻ, xáo ngẫu nhiên → `01-card-pool-deal.md`.
-- Mỗi người được chia 11 thẻ. Lượt đi theo chiều kim đồng hồ.
+- Mỗi người được chia `HAND_SIZE` (7) thẻ. Lượt đi theo chiều kim đồng hồ.
 - Lượt của 1 người gồm 3 bước theo thứ tự:
   1. **Draw** — bốc 1 thẻ từ pool lên tay → `02-draw-reveal.md`.
   2. **Check** — có thể reveal 0..N món đang ráp đủ trong tay; thẻ đó rời tay,
-     món nằm ngửa trước mặt, cộng điểm → `02-draw-reveal.md`.
+     món nằm ngửa trước mặt, cộng điểm → `02-draw-reveal.md`. Thu món xong tự bốc bù lên
+     `HAND_SIZE`+1 → `08-hand-refill.md`.
   3. **Play** — đánh 1 thẻ ra giữa bàn. Người khác có thể tố thẻ đó nếu ráp ra
      món; món điểm cao hơn thắng quyền tố → `03-play-claim.md`.
-- 20 món chia 3 loại (Appetizer/Main/Dessert), điểm theo số thẻ của món → `04-food-score-end.md`.
-- Hết ván khi 1 người có đủ 3 loại món (người đó +10 điểm thưởng) hoặc pool
-  cạn. Điểm cao nhất thắng → `04-food-score-end.md`.
+- 20 món chia 3 loại (Appetizer/Main/Dessert, giờ chỉ là nhãn hiển thị), điểm
+  theo số thẻ của món → `04-food-score-end.md`.
+- Đầu ván sinh **Menu** công khai (`MENU_SIZE` món rút từ 20 món gốc) rồi giao
+  riêng **Order** bí mật cho từng người (`ORDER_SIZE` món rút từ Menu) →
+  `07-menu-orders.md`. Bộ bài (pool) chỉ chứa nguyên liệu phục vụ Menu ván đó.
+- Hết ván khi 1 người xong toàn bộ Order của họ (+`ORDER_BONUS`) hoặc pool
+  cạn. Điểm cao nhất thắng → `04-food-score-end.md`, `07-menu-orders.md`.
 - Chơi 1 người thật vs. 1–3 AI → `05-ai-player.md`; hoặc phòng online 2–4 người, ghế trống do AI ngồi → `06-online-room.md`.
 
 **Dynamics**
@@ -44,11 +52,12 @@ ráp món ngay hay giữ bài đánh lớn, rồi đánh 1 thẻ ra — và đ�
   (2 điểm) nhưng thêm Chili + Lemongrass thành Bun Bo Hue (7 điểm). Giữ thì có
   thể bị người khác đua về 3 loại trước.
 - Muốn thấy: đọc bàn — nhìn món đã ngửa và thẻ đã đánh để đoán ai đang cần gì,
-  tránh đánh ra thẻ nuôi đối thủ.
+  tránh đánh ra thẻ nuôi đối thủ; giờ còn là đoán **Order** bí mật của đối
+  thủ, không chỉ loại còn thiếu → `07-menu-orders.md`.
 - Muốn thấy: tranh thẻ Pork (có trong 9/20 món) — tài nguyên nghẽn tự nhiên.
-- **Không muốn:** reveal ngay mọi món 2 thẻ rẻ để đua 3 loại, không bao giờ
-  giữ bài. Chặn bởi: điểm món tăng mạnh theo số thẻ (2 → 4 → 7) nên chốt rẻ
-  dễ về đích đầu nhưng thua điểm; thưởng +10 chỉ bù được 1 phần.
+- **Không muốn:** reveal ngay mọi món 2 thẻ rẻ để đua xong Order, không bao
+  giờ giữ bài. Chặn bởi: điểm món tăng mạnh theo số thẻ (2 → 4 → 7) nên chốt
+  rẻ dễ về đích đầu nhưng thua điểm; thưởng `ORDER_BONUS` chỉ bù được 1 phần.
 - **Không muốn:** không ai tố bao giờ vì hiếm khi ráp được. Theo dõi qua log
   hành động, không có bộ đếm số lần tố trên HUD. (sửa 2026-09-16 (2))
 
@@ -66,10 +75,11 @@ Người thích card game/mạt chược nhẹ, chơi ở bàn máy tính hoặc
 
 ## Win / lose
 
-- Ván kết thúc ngay khi 1 người có món thuộc đủ 3 loại (người đó +10), hoặc
-  khi đến lượt bốc mà pool rỗng (không ai được thưởng).
-- Người có tổng điểm cao nhất thắng — kể cả khi không phải người về 3 loại đầu.
-  Hoà điểm thì đồng hạng.
+- Ván kết thúc ngay khi 1 người xong toàn bộ **Order** riêng của họ (vài món
+  bí mật rút từ Menu công khai của ván, +`ORDER_BONUS`), hoặc khi đến lượt
+  bốc mà pool rỗng (không ai được thưởng) → `07-menu-orders.md`.
+- Người có tổng điểm cao nhất thắng — kể cả khi không phải người xong Order
+  đầu. Hoà điểm thì đồng hạng.
 
 ## Controls (responsive, chuột hoặc cảm ứng — sửa 2026-09-16 (3), stack trên mặt bàn)
 

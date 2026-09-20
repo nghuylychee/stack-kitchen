@@ -1,14 +1,17 @@
 # 04 — Food, Score & End
 
-**Status:** BUILT (prototype 2026-09-16)
+**Status:** BUILT (2026-09-19, backlog #9–#10 — kết thúc theo Order + màn kết thúc, `07-menu-orders.md`)
 **Attaches to:** điểm và điều kiện kết thúc ván của `00-core.md`
 
 ## Overview
 
-20 món Việt Nam (lấy từ 006) được chia thành 3 loại: Appetizer, Main, Dessert.
-Món càng nhiều nguyên liệu càng nhiều điểm. Người đầu tiên có món thuộc cả 3
-loại kết thúc ván và nhận thưởng lớn — nhưng người thắng là người **tổng điểm
-cao nhất**.
+20 món Việt Nam (lấy từ 006) được chia thành 3 loại: Appetizer, Main, Dessert
+— cột "Loại" giờ chỉ là nhãn hiển thị (`07-menu-orders.md` Rule 1), không còn
+ràng buộc luật. Món càng nhiều nguyên liệu càng nhiều điểm. ~~Người đầu tiên
+có món thuộc cả 3 loại kết thúc ván và nhận thưởng lớn~~ — thay bởi
+`07-menu-orders.md`: người đầu tiên xong hết **Order** riêng của mình (vài
+món bí mật rút từ Menu công khai của ván) kết thúc ván và nhận `ORDER_BONUS`
+— nhưng người thắng vẫn là người **tổng điểm cao nhất**.
 
 ## MDA
 
@@ -32,12 +35,20 @@ cao nhất**.
 ## Rules
 
 1. Điểm món = `POINTS_BY_SIZE[số thẻ trong công thức]`.
-2. Người chơi "có" 1 loại khi đã reveal ít nhất 1 món thuộc loại đó.
-3. **Kết thúc A:** ngay sau 1 lần reveal (tự reveal hoặc tố), nếu người đó có
-   đủ 3 loại → người đó +`FIRST_FULL_BONUS`, ván dừng lập tức. Chỉ có đúng 1 người nhận thưởng.
-4. **Kết thúc B:** tới lượt Draw mà pool rỗng → ván dừng, không ai nhận thưởng.
-5. Xếp hạng theo tổng điểm (món + thưởng). Hoà điểm → đồng hạng.
-6. Màn kết thúc hiện: bảng điểm từng người, món đã reveal, ai về đích, lý do kết thúc.
+2. **[KHÔNG CÒN GATE THẮNG/THUA — xem `07-` Rule 9]** ~~Người chơi "có" 1 loại
+   khi đã reveal ít nhất 1 món thuộc loại đó~~ → khái niệm "đã xong" giờ tính
+   theo **món trong Order**, không theo loại (`07-menu-orders.md` Rule 9).
+3. **[THAY BỞI `07-menu-orders.md` Rule 10 — Kết thúc A']** ~~Kết thúc A: ngay
+   sau 1 lần reveal, nếu người đó có đủ 3 loại → +`FIRST_FULL_BONUS`, ván dừng
+   lập tức~~ → dừng ván ngay khi 1 người xong toàn bộ **Order** của họ,
+   +`ORDER_BONUS`. `FIRST_FULL_BONUS` ngừng dùng (xem Numbers).
+4. **Kết thúc B (không đổi, xem `07-` Rule 11):** tới lượt Draw mà pool rỗng →
+   ván dừng, không ai nhận thưởng.
+5. Xếp hạng theo tổng điểm (món + thưởng — thưởng nay là `ORDER_BONUS`,
+   `07-`). Hoà điểm → đồng hạng.
+6. Màn kết thúc hiện: bảng điểm từng người, món đã reveal, ai về đích, lý do
+   kết thúc, **+ Order đầy đủ của từng người kèm đánh dấu xong/chưa xong**
+   (`07-menu-orders.md` Rule 13).
 
 ## Numbers
 
@@ -46,7 +57,7 @@ cao nhất**.
 | `POINTS_BY_SIZE[2]` | 2 | 1–3 | GUESS | món rẻ |
 | `POINTS_BY_SIZE[3]` | 4 | 3–5 | GUESS | |
 | `POINTS_BY_SIZE[4]` | 7 | 5–10 | GUESS | đủ lớn để đáng giữ bài |
-| `FIRST_FULL_BONUS` | 10 | 5–20 | GUESS | "lượng điểm lớn" theo người dùng, không tự thắng |
+| `FIRST_FULL_BONUS` | 10 | 5–20 | GUESS | **[không còn dùng — thay bởi `ORDER_BONUS`, `07-menu-orders.md` Numbers, cùng giá trị 10]** giữ dòng lại, số không tái sử dụng cho hằng số khác |
 
 ## Bảng món (loại = GUESS, người dùng chưa chốt)
 
@@ -83,17 +94,21 @@ Sauce, Sugar, Water, Gac Fruit. Ảnh: `Art/Card/`, `Art/Food/`.
 
 ## Edge cases
 
-- Reveal món thứ 3 cùng loại đã có → chỉ cộng điểm, không kết thúc.
-- Người về đích nhưng điểm thấp hơn → vẫn thua; màn kết thúc ghi rõ cả 2.
-- Pool rỗng khi không ai có đủ 3 loại → Kết thúc B, xếp hạng bình thường.
+- Reveal lại 1 món đã xong (kể cả món ngoài Order) → chỉ cộng điểm, không đổi
+  trạng thái "đã xong" (`07-` Rule 9).
+- Người xong Order trước nhưng điểm thấp hơn → vẫn thua; màn kết thúc ghi rõ cả 2.
+- Pool rỗng khi chưa ai xong Order → Kết thúc B, xếp hạng bình thường.
 
 ## Depends on
 
 - `02-draw-reveal.md`, `03-play-claim.md` — nơi reveal xảy ra.
+- `07-menu-orders.md` — Menu/Order quyết định tập công thức khả dụng và điều
+  kiện kết thúc ván (thay Rule 2–3 ở trên).
 
 ## Done when
 
 - Điểm mỗi người hiện liên tục, đúng bảng.
-- Bảng Recipes trong game hiện đủ 20 món theo loại + điểm.
-- Người đầu tiên có đủ 3 loại → ván dừng ngay, +10, màn kết thúc xếp hạng đúng.
+- Bảng Recipes trong game hiện đủ 20 món theo loại + điểm (loại chỉ còn là nhãn hiển thị).
+- Người đầu tiên xong toàn bộ Order → ván dừng ngay, +`ORDER_BONUS`, màn kết
+  thúc xếp hạng đúng kèm Order từng người.
 - Chạy ván tới hết pool → màn kết thúc với lý do "pool empty".
