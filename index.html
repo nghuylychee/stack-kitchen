@@ -8,13 +8,25 @@
 <body>
 <!-- ============ RESTAURANT (main screen — design/ui/restaurant.md) ============ -->
 <div id="restaurant" class="screen" hidden>
+  <!-- HUD = card của người chơi (ui/restaurant.md Tuning pass (3) mục 1 + (6), art.md "HUD là một card").
+       Không có hình khối riêng: mượn đúng .hdr / .cchip / .ph / .ftr của thẻ bài.
+       TP(6): góc TRÁI DƯỚI — đỉnh là thanh XP + level, thân là chân dung, đáy là ô nhập tên;
+       gold đã dời sang card SHOP; nút toggle bật/tắt dải card đứng ngay cạnh. -->
   <div id="rest-hud">
-    <input id="rest-name" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Tap to name your chef">
-    <div class="rh-lvl"><span id="rest-level">Level 1</span><span class="xpbar"><i id="rest-xp"></i></span><span id="rest-xptext"></span></div>
-    <div class="rh-gold"><span class="coin"></span><b id="rest-gold">0</b></div>
-    <div class="rh-away" id="rest-away" hidden></div>
-    <div class="rh-hint" id="rest-hint" hidden></div>
     <div class="rh-warn" id="rest-warn" hidden></div>
+    <div class="rh-hint" id="rest-hint" hidden></div>
+    <div class="rh-away" id="rest-away" hidden></div>
+    <div class="rh-row">
+      <div class="card chef-card">
+        <span class="cchip" id="rest-level">1</span>
+        <span class="hdr"><span class="xpbar"><i id="rest-xp"></i><em id="rest-xptext"></em></span></span>
+        <span class="ph"><span class="phl" id="rest-face">?</span></span>
+        <span class="ftr"><input id="rest-name" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Name your chef"></span>
+      </div>
+      <button id="rest-toggle" aria-label="Hide cards" title="Hide cards">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
+    </div>
   </div>
 
   <div id="rest-stage"><div id="rest-grid"><div id="rest-drop" hidden></div></div></div>
@@ -22,7 +34,7 @@
   <div id="rest-nav">
     <button class="card nav-card" id="navBots" data-pop="pop-bots"><span class="hdr"><span>Play vs Bots</span></span><span class="ph"><span class="phl">VS</span></span></button>
     <button class="card nav-card" id="navOnline" data-pop="pop-online"><span class="hdr"><span>Online Room</span></span><span class="ph"><span class="phl">ON</span></span></button>
-    <button class="card nav-card" id="navShop"><span class="hdr"><span>Shop</span></span><span class="ph"><span class="phl">SH</span></span></button>
+    <button class="card nav-card" id="navShop"><span class="hdr"><span>Shop</span></span><span class="ph"><span class="phl">SH</span></span><span class="pchip" id="rest-gold">0</span></button>
     <button class="card nav-card" id="navMenu"><span class="hdr"><span>Menu</span></span><span class="ph"><span class="phl">ME</span></span></button>
   </div>
 
@@ -41,6 +53,12 @@
       </div>
     </div>
   </div>
+
+  <!-- Cheat: xoá sạch save, chơi lại quán từ đầu (ui/restaurant.md "Nút reset (cheat)").
+       Góc PHẢI DƯỚI, đối xứng với nút toggle ở góc trái. Hai nhịp chạm mới xoá. -->
+  <button id="rest-reset" aria-label="Reset restaurant" title="Reset restaurant">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 3.5V9h-5.5"/></svg>
+  </button>
 
   <div class="home-msg" id="rest-msg"></div>
 </div>

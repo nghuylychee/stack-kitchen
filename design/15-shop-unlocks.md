@@ -1,6 +1,6 @@
 # 15 — Shop & Unlocks (tiêu gold, mở khoá theo level)
 
-**Status:** BUILT (2026-09-20, backlog #27)
+**Status:** BUILT (2026-09-20, backlog #27; món không đặt lên lưới #39)
 **Attaches to:** card `SHOP` ở màn quán (`design/ui/restaurant.md`) → ghi vào `items` của save
 (`12-restaurant-meta.md` Rule 2), đặt đồ qua `13-restaurant-grid.md` Rule 10.
 
@@ -39,8 +39,8 @@ vẫn hiện nhưng khoá, ghi rõ cần level mấy — để người chơi nh
 1. Shop mở bằng card `SHOP` ở dải điều hướng; là **overlay trên màn quán**, không phải màn riêng —
    đóng lại là thấy ngay quán vừa đổi.
 2. **Catalogue là danh sách tĩnh trong code** (`src/meta/shop.ts`), mỗi món:
-   `{ id, name, kind: 'facility' | 'decor', w, h, price, minLevel, blurb }`. `name`/`blurb` là
-   in-game text nên viết tiếng Anh.
+   `{ id, name, kind: 'facility' | 'decor' | 'hire', w, h, price, minLevel, blurb }`. `name`/`blurb`
+   là in-game text nên viết tiếng Anh. `'hire'` là loại không đặt lên lưới (Rule 9).
 3. **Trạng thái mỗi card** (đúng một trạng thái tại một thời điểm, theo thứ tự ưu tiên):
    1. **Khoá level** — `save.level < minLevel` → hiện "Level N" thay giá, không mua được.
    2. **Hết chỗ** — lưới không còn ô trống cho footprint đó (`13-` Rule 10) → nút tắt, ghi lý do.
@@ -56,12 +56,23 @@ vẫn hiện nhưng khoá, ghi rõ cần level mấy — để người chơi nh
    vì chưa có khách — chúng chỉ chiếm chỗ và trông ra cái quán. Tác dụng thật (chỗ ngồi, số món nấu
    song song) tới ở `16-customers-idle.md`, đợt 2. `blurb` được phép nói trước công dụng đó.
 8. Giá và `minLevel` nằm trong `src/core/config.ts` để người duyệt tự vặn.
+9. **Món không đặt lên lưới** (thêm 2026-09-20, `18-staff.md` Rule 14). Từ card *thuê nhân viên*
+   trở đi, shop có loại món **không có footprint**: mua xong không có ô nào bị chiếm, chỉ một con số
+   trong save tăng lên. Hệ quả cho Rule 3 và Rule 4:
+   - Trạng thái "hết chỗ" **không áp dụng** cho loại này — nó không cần ô trống nào.
+   - Thêm một trạng thái cuối bảng ưu tiên: **kịch trần** (đã mua hết số lượng cho phép) → card vẫn
+     hiện, ghi rõ, bấm không ăn.
+   - Giá có thể **thay đổi theo số đã mua** (người thứ 3 đắt hơn người thứ 2). Card đọc giá của lần
+     mua kế tiếp, không phải một số cố định.
+   - Card vẫn bay từ shop về **đúng cái vừa mua** trên sàn quán (Rule 4), chỉ khác là đích đến là
+     nhân viên mới chứ không phải một ô lưới.
 
 ## Catalogue đợt 1
 
 | id | name (in-game) | kind | price | minLevel | blurb |
 |---|---|---|---|---|---|
 | `table_basic` | Street Table | facility | 150 | 1 | "Seats one more customer." |
+| `staff_hire` | Waiter | hire | 250 / 700 / 1500 | 2 / 5 / 8 | "Takes orders, cooks, serves. One more pair of hands." |
 | `plant_pot` | Potted Plant | decor | 80 | 1 | "Green corner. Purely for looks." |
 | `kitchen_extra` | Second Burner | facility | 400 | 3 | "Cook one more dish at a time." |
 

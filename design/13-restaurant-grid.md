@@ -1,6 +1,6 @@
 # 13 — Restaurant Grid (lưới đặt đồ, kéo thả tự do)
 
-**Status:** AGREED (2026-09-20 — Tuning pass (3): camera zoom/pan + lưới rộng, backlog #32)
+**Status:** BUILT (2026-09-20, backlog #32 — Tuning pass (3): camera zoom/pan + lưới rộng)
 *(trước đó BUILT #25, Numbers sửa ở #29)*
 **Attaches to:** khu giữa màn quán (`12-restaurant-meta.md` Rule 2 — `items[].x/y`).
 
@@ -100,6 +100,7 @@ lại + rung" đã dùng cho thẻ bài.
 | `ZOOM_WHEEL_STEP` | 0.0015 | 0.0005–0.005 | GUESS | hệ số nhân cho mỗi đơn vị `deltaY` của con lăn |
 | footprint facility (`table_basic`, `kitchen_basic`…) | 2×3 | — | GUESS | **sửa 2026-09-20** (từ 2×2): dáng dọc 2:3 đúng tỉ lệ `.card` của bàn chơi, để card quán không bị bóp thành hình vuông — xem `ui/restaurant.md` Tuning pass (1) |
 | footprint `decor` (chậu cây…) | 1×2 | — | GUESS | **sửa 2026-09-20** (từ 1×1): cùng lý do, card nhỏ vẫn phải là card dọc |
+| footprint NPC (khách `16-`, nhân viên `18-`) | 2×2 | — | GUESS | **sửa 2026-09-20 (6)** (từ 1×2): card vuông, **to hơn decor** — người phải nổi hơn đồ đạc, và khung vuông chứa vừa một hình người đứng cả thân (`16-` Rule 14, `art.md` §5b). NPC **không chiếm ô** nên con số này chỉ là kích thước vẽ + khoảng cách chỗ ngồi/chỗ đứng, không ăn vào mặt bằng |
 
 Lưới 40×28 chứa tối đa 20×9 = 180 món facility. "Vô hạn" theo nghĩa người chơi cảm nhận: mở rộng
 quán = sửa **một con số** trong `config.ts`, không phải sửa code. Cố tình **không** làm lưới vô hạn

@@ -1,7 +1,7 @@
 // 12-restaurant-meta.md — toàn bộ state của quán nằm ở đây.
 // Rule 6 (bất di bất dịch): core/, ai/ và net/ KHÔNG BAO GIỜ import file này. Ván bài không
 // biết quán tồn tại. Chiều ngược lại (meta đọc core/) thì được phép.
-import { GRID_COLS, GRID_ROWS, MENU_SLOTS, START_DISHES, START_GOLD, START_LEVEL } from '../core/config';
+import { GRID_COLS, GRID_ROWS, MENU_SLOTS, STAFF_MAX, STAFF_START, START_DISHES, START_GOLD, START_LEVEL } from '../core/config';
 import { RECIPES } from '../core/data';
 
 export interface PlacedItem { id: number; type: string; x: number; y: number }
@@ -14,11 +14,13 @@ export interface Save {
   items: PlacedItem[];   // đồ đã sở hữu + ô của nó (13-restaurant-grid.md)
   dishes: string[];      // món đã mở khoá bằng cách nấu trong ván (17- Rule 2)
   menu: string[];        // món đang treo trong quán, tối đa MENU_SLOTS (17- Rule 4)
+  staff: number;         // số nhân viên đã thuê, tối đa STAFF_MAX (18- Rule 1, 14)
   lastSeen: number;      // epoch ms — 16-customers-idle.md đọc để tính thu nhập lúc vắng mặt
 }
 
 export const SAVE_KEY = 'sk.save';
-export const SAVE_VERSION = 2;        // v1 -> v2: thêm dishes/menu (17- Rule 9), migrate chứ không xoá
+export const SAVE_VERSION = 3;        // v1 -> v2: thêm dishes/menu (17- Rule 9)
+                                      // v2 -> v3: thêm staff (18- Rule 15). Luôn migrate, không xoá.
 const OLD_NICK_KEY = 'sk-nick';        // tên người chơi của bản trước màn quán
 
 let blocked = false;                    // localStorage không ghi được (private mode…)
@@ -39,6 +41,7 @@ export function startSave(): Save {
     v: SAVE_VERSION, name: '', level: START_LEVEL, xp: 0, gold: START_GOLD,
     items: [{ id: 1, type: 'kitchen_basic', x, y }, { id: 2, type: 'table_basic', x: x + 2, y }],
     dishes: [...start], menu: start.slice(0, MENU_SLOTS),
+    staff: STAFF_START,
     lastSeen: Date.now(),
   };
 }
@@ -86,6 +89,8 @@ export function loadSave(): Save {
       items: o.items.filter(it => it && typeof it.type === 'string')
         .map((it, i) => ({ id: int(it.id, i + 1), type: it.type, x: int(it.x, 0), y: int(it.y, 0) })),
       dishes, menu,
+      // 18- Rule 15: save cũ (v1/v2) không có field này → quán được coi như đang có kíp khởi điểm.
+      staff: Math.max(0, Math.min(STAFF_MAX, int(o.staff, STAFF_START))),
       lastSeen: int(o.lastSeen, Date.now()),
     };
   } catch (e) {

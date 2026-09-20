@@ -7,32 +7,86 @@
 #restaurant { flex-direction:column; align-items:stretch; justify-content:flex-start; padding:0; overflow:hidden;
   background-color:transparent; background-image:none; }   /* để nền trang (body) lộ qua, không vẽ chồng */
 
-/* ---------- HUD (góc trái trên) ---------- */
-#rest-hud { position:absolute; top:16px; left:16px; z-index:3; width:clamp(220px,22vw,300px);
-  background:rgba(32,27,22,.82); backdrop-filter:blur(3px); border:2px solid var(--panel-border); border-radius:12px; padding:10px 12px;
+/* ---------- HUD (góc trái DƯỚI) — art.md "HUD là một card", ui/restaurant.md TP(3) + TP(6) ---------- */
+/* HUD KHÔNG có hình khối riêng: nó là card của người chơi, mượn đúng bộ phận của .card —
+   .hdr = thanh XP (chip level đè mép trái), .ph = chân dung, .ftr = băng tên đáy (đúng cách
+   .fcard đã để tên ở đáy từ bàn chơi). Gold đã dời sang card SHOP (TP(6) mục 2).
+   Bản Hay Day (#35) và token --hud-* của nó đã bỏ; --xp/--xp-lt giữ lại. */
+:root { --xp:#6cc24a; --xp-lt:#9be07c; --staff:#5b9ad6; }
+
+/* TP(6): cả cụm xuống góc trái dưới, NẰM TRÊN dải nav (z-index 4 > 3) để không bị nền mờ của nav
+   phủ lên. Ba dòng chữ mọc NGƯỢC LÊN phía trên card vì card đã sát đáy màn. */
+#rest-hud { position:absolute; bottom:14px; left:14px; z-index:4;
   pointer-events:none;   /* card nằm dưới HUD vẫn kéo được (13- Edge cases) */
-  display:flex; flex-direction:column; gap:8px; box-shadow:0 10px 28px rgba(0,0,0,.45); }
-#rest-name { pointer-events:auto; width:100%; min-height:44px; font-size:18px; font-weight:800; color:var(--text);
-  background:transparent; border:1px solid transparent; padding:0 6px; }
-#rest-name:hover { border-color:var(--panel-border); }
-#rest-name::placeholder { color:var(--text-dim); font-weight:400; font-size:14px; }
-.rh-lvl { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim); }
-.rh-lvl #rest-level { color:var(--text); font-weight:700; flex:none; }
-.xpbar { flex:1; height:6px; border-radius:3px; background:rgba(0,0,0,.35); overflow:hidden; }
-.xpbar i { display:block; height:100%; width:0; background:var(--gold); transition:width .45s ease-out; }
-#rest-xptext { flex:none; font-size:11px; }
-.rh-gold { display:flex; align-items:center; gap:6px; font-size:20px; font-weight:900; color:var(--gold); }
-.rh-gold .coin { width:14px; height:14px; border-radius:50%; background:var(--gold); box-shadow:inset 0 -2px 0 rgba(0,0,0,.25); }
-.rh-gold.punch { animation:punch .3s ease-out; }
-.rh-warn { font-size:11px; line-height:1.3; color:var(--text-dim); border-top:1px solid var(--panel-border); padding-top:6px; }
+  display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+.rh-row { display:flex; align-items:flex-end; gap:8px; }
+
+/* cùng công thức bề rộng với .nav-card ở đáy màn — hai chỗ phải đọc ra là cùng một bộ bài */
+.chef-card { --w:clamp(104px,11vw,128px); --h:calc(var(--w) * 1.55); --fs:12px;
+  --ftr:44px; --bar:36px; }
+
+/* đỉnh card = thanh XP. Chip level đè mép trái đúng chỗ chip khoá món, nên nó nằm NGAY TRÊN cái
+   thanh mà nó đo — xanh lá của chip và của ruột thanh là cùng một khái niệm (art.md §2). */
+.chef-card .hdr { height:var(--bar); padding:0 6px 0 calc(var(--w) * .27); }
+.chef-card .cchip { width:max(26px, calc(var(--w) * .23)); height:max(26px, calc(var(--w) * .23));
+  background:var(--xp); color:var(--dark); font-size:calc(var(--fs) + 3px); border-width:2px; z-index:3; }
+.chef-card .xpbar { position:relative; flex:1; height:15px; border-radius:8px;
+  background:rgba(0,0,0,.5); overflow:hidden; }
+.chef-card .xpbar i { display:block; height:100%; width:0; transition:width .45s ease-out;
+  background:linear-gradient(180deg, var(--xp-lt) 0 45%, var(--xp) 45%); }
+#rest-xptext { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-style:normal; font-size:9px; font-weight:800; color:var(--text); text-shadow:0 1px 1px rgba(0,0,0,.65); }
+
+.chef-card .ph { top:calc(var(--bar) + 3px); bottom:calc(var(--ftr) + 3px);
+  display:flex; align-items:center; justify-content:center; }
+.chef-card .phl { font-weight:900; color:#8a7f6a; font-size:calc(var(--w) * .34); }
+.chef-card .ph img { position:absolute; inset:0; }
+
+/* đáy card = ô nhập tên, cao ≥ 44px cho đủ tap target */
+.chef-card .ftr { position:absolute; left:0; right:0; bottom:0; height:var(--ftr);
+  display:flex; align-items:center; padding:0 6px; background:rgba(20,16,10,.55); }
+#rest-name { pointer-events:auto; width:100%; min-width:0; height:100%; padding:0;
+  font-size:12px; font-weight:800; color:var(--text);
+  background:transparent; border:0; border-bottom:2px dashed transparent; }
+#rest-name:hover { border-bottom-color:var(--gold-soft); }
+#rest-name:focus { border-bottom-color:var(--gold); outline:none; }
+#rest-name::placeholder { color:var(--text-dim); font-weight:700; font-size:11px; }
+
+/* TP(6) mục 3: nút bật/tắt dải card điều hướng, đứng ngay cạnh card chef */
+#rest-toggle { pointer-events:auto; width:44px; height:44px; padding:0; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  background:var(--panel); border:2px solid var(--panel-border); box-shadow:0 4px 10px rgba(0,0,0,.45); }
+#rest-toggle svg { width:24px; height:24px; fill:none; stroke:var(--text); stroke-width:2.4;
+  stroke-linecap:round; stroke-linejoin:round; transition:transform .2s ease-out; }
+#restaurant.nav-off #rest-toggle svg { transform:rotate(180deg); }
+#rest-toggle.punch { animation:punch .3s ease-out; }   /* dải card tắt → tiền bay về ĐÂY (TP(6) mục 2) */
+
+/* #44: nút reset (cheat) — cùng hình khối với #rest-toggle, góc phải dưới. z-index 4 để nổi trên
+   dải gradient của #rest-nav (z-index 3). Nhịp 1 chạm xong thì đổi sang đỏ cảnh báo. */
+#rest-reset { position:absolute; right:14px; bottom:14px; z-index:4;
+  width:44px; height:44px; padding:0; border-radius:50%; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--panel); border:2px solid var(--panel-border); box-shadow:0 4px 10px rgba(0,0,0,.45);
+  opacity:.55; transition:opacity .15s ease-out, transform .12s ease-out; }
+#rest-reset:hover { opacity:1; transform:translateY(-2px); }
+#rest-reset svg { width:22px; height:22px; fill:none; stroke:var(--text); stroke-width:2.4;
+  stroke-linecap:round; stroke-linejoin:round; }
+#rest-reset.armed { opacity:1; border-color:var(--invalid); animation:punch .3s ease-out; }
+#rest-reset.armed svg { stroke:var(--invalid); }
+
+.rh-away { font-size:13px; font-weight:900; color:var(--gold); text-shadow:0 2px 0 rgba(0,0,0,.6); }
+.rh-hint, .rh-warn { max-width:200px; font-size:11px; line-height:1.3;
+  color:var(--text-dim); text-shadow:0 1px 0 rgba(0,0,0,.6); }
 
 /* ---------- lưới quán ---------- */
 /* Tuning pass (1): lưới phủ kín màn; HUD và dải card nổi đè lên trên, không ăn chỗ của lưới. */
-#rest-stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:auto; }
-#rest-grid { position:relative; flex:none; touch-action:none;
+/* Tuning pass (2): camera — stage không cuộn, #rest-grid được đặt bằng một transform duy nhất. */
+#rest-stage { position:absolute; inset:0; overflow:hidden; touch-action:none; cursor:grab; }
+#rest-stage.panning { cursor:grabbing; }
+#rest-grid { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform; touch-action:none;
   background-image:linear-gradient(0deg, var(--sidewalk-line) 1px, transparent 1px),
                    linear-gradient(90deg, var(--sidewalk-line) 1px, transparent 1px);
-  background-position:0 0; border:1px solid var(--sidewalk-line); border-radius:6px; }
+  background-position:0 0; }   /* không viền/bo góc: mép lưới không bao giờ lọt vào khung nhìn (13- Rule 16) */
 .ritem { position:absolute; box-shadow:0 6px 16px rgba(0,0,0,.45); cursor:grab; touch-action:none; }  /* mặt card kế thừa .card (table.css) */
 .ritem:hover { transform:translateY(-4px); transition:transform .12s ease-out; }
 .ritem.dragging { opacity:.25; transform:none; }
@@ -46,7 +100,11 @@
 .ritem.decor { border-color:var(--dec); }
 .ritem .ph, .nav-card .ph { display:flex; align-items:center; justify-content:center; }
 .ritem .phl, .nav-card .phl { font-weight:900; color:#8a7f6a; font-size:calc(var(--w) * .34); }  /* art.md §2 placeholder */
-.ritem .ph img { position:absolute; inset:0; }
+/* art.md §3 (2026-09-20 (6)): ảnh props/NPC là hình cắt nền, không phải ảnh chụp full-bleed như
+   thẻ nguyên liệu — `cover` sẽ xén mất đầu/chân. `contain` + nền sáng để ảnh nền trắng (.jpg)
+   và ảnh trong suốt (.png) nằm trên cùng một mặt. */
+.ritem .ph img { position:absolute; inset:0; object-fit:contain; }
+.ritem .ph { background:#fff; }
 
 /* ---------- dải card điều hướng ---------- */
 #rest-nav { position:absolute; left:0; right:0; bottom:0; z-index:3; height:clamp(150px,21vh,196px);
@@ -58,6 +116,13 @@
 .nav-card:hover { transform:translateY(-8px); }
 .nav-card.on { box-shadow:0 3px 6px rgba(0,0,0,.35), 0 0 0 3px var(--gold); }
 .nav-card:focus:not(:focus-visible) { outline:none; }   /* vòng focus của chuột hay bị đọc nhầm là card đang mở */
+/* TP(6) mục 2: gold là viên .pchip của card SHOP — tiền nằm trên cái cửa dẫn tới chỗ tiêu nó. */
+#rest-gold { font-size:calc(var(--fs) + 3px); padding:1px 7px; z-index:3; }
+#rest-gold.punch { animation:punch .3s ease-out; }
+/* TP(6) mục 3: tắt dải card = trượt xuống + mờ, không chiếm chạm nữa */
+#rest-nav { transition:transform .22s ease-out, opacity .22s ease-out; }
+#restaurant.nav-off #rest-nav { transform:translateY(105%); opacity:0; pointer-events:none; }
+#restaurant.nav-off #rest-msg { bottom:12px; }
 
 /* ---------- popover trên card điều hướng ---------- */
 #rest-pop { position:absolute; z-index:4; width:clamp(240px,26vw,300px);
@@ -76,6 +141,7 @@
   background:var(--panel-2); border:1px solid var(--panel-border); }
 .shop-thumb { flex:none; }
 .shop-thumb.facility { border-color:var(--fac); } .shop-thumb.decor { border-color:var(--dec); }
+.shop-thumb.hire { border-color:var(--staff); }      /* 15- Rule 9: món không đặt lên lưới */
 .shop-thumb .fp { position:absolute; right:3px; bottom:3px; z-index:2; font-size:10px; font-weight:700;
   color:var(--text-dim); background:rgba(20,16,10,.6); border-radius:4px; padding:0 4px; }
 .shop-txt { flex:1; display:flex; flex-direction:column; gap:3px; min-width:0; }
@@ -86,8 +152,10 @@
 .shop-buy .coin { width:12px; height:12px; border-radius:50%; background:var(--dark); opacity:.55; }
 .shop-row.poor .shop-buy { background:var(--panel); color:var(--invalid); border-color:var(--panel-border); }
 .shop-row.poor .shop-buy .coin { background:var(--invalid); opacity:.7; }
-.shop-row.locked .shop-buy, .shop-row.noroom .shop-buy { background:var(--panel); color:var(--text-dim); border-color:var(--panel-border); }
+.shop-row.locked .shop-buy, .shop-row.noroom .shop-buy,
+.shop-row.maxed .shop-buy { background:var(--panel); color:var(--text-dim); border-color:var(--panel-border); }
 .shop-row.locked .shop-thumb, .shop-row.noroom .shop-thumb { filter:brightness(.7) saturate(.6); }
+.shop-row.maxed .shop-thumb { box-shadow:0 3px 6px rgba(0,0,0,.35), 0 0 0 2px var(--staff); }  /* đủ kíp, không mờ */
 
 /* ---------- bảng menu quán (17-restaurant-menu.md, ui/restaurant.md "Đợt 2") ---------- */
 #menuBox { max-width:720px; width:100%; max-height:80vh; display:flex; flex-direction:column; gap:10px; }
@@ -114,23 +182,34 @@
 .cus { position:absolute; left:0; top:0; width:var(--w); height:var(--h); }
 /* .card có overflow:hidden → bong bóng KHÔNG được là con của nó, nếu không sẽ bị cắt mất. */
 .cusface { width:100%; height:100%; border-color:var(--cus); box-shadow:0 6px 16px rgba(0,0,0,.45); }
+.cus.staff .cusface { border-color:var(--staff); }      /* 18-: nhân viên cùng card, khác màu viền */
 .cus .ph { display:flex; align-items:center; justify-content:center; }
 .cus .phl { font-weight:900; color:#8a7f6a; font-size:calc(var(--w) * .34); }
-.cus .ph img { position:absolute; inset:0; }
+.cus .ph img { position:absolute; inset:0; object-fit:contain; }
+.cus .ph { background:#fff; }
 /* bong bóng món trên đầu khách */
 .cus .bub { position:absolute; left:50%; bottom:calc(100% + 6px); transform:translateX(-50%); }
 .cus-bub { position:relative; padding:3px; border-radius:12px; background:rgba(13,11,9,.82);
   border:1px solid var(--panel-border); box-shadow:0 6px 14px rgba(0,0,0,.5); }
 .cus-bub::after { content:''; position:absolute; left:50%; top:100%; margin-left:-5px;
   border:5px solid transparent; border-top-color:rgba(13,11,9,.82); }
-.cus-bub.waiting { animation:goldpulse 1.1s ease-in-out infinite; }
-/* 16- Rule 7: vòng tiến trình chạy quanh bong bóng trong lúc bếp nấu */
-.cus-bub.cooking { --p:0%; background:
-  conic-gradient(var(--gold) var(--p), rgba(0,0,0,0) 0) border-box,
-  linear-gradient(rgba(13,11,9,.92), rgba(13,11,9,.92)) padding-box; border-color:transparent; }
+/* TP(5): ba trạng thái icon — ruột bong bóng là một ô vuông mặt kem như mặt card, icon vẽ bằng
+   nét SVG nên không cần file ảnh nào (art.md "Icon trạng thái"). */
+.cus-bub .icn { width:var(--d); height:var(--d); border-radius:8px; background:var(--ing-bg);
+  display:flex; align-items:center; justify-content:center; }
+.cus-bub .icn svg { width:74%; height:74%; fill:none; stroke:var(--dark); stroke-width:1.8;
+  stroke-linecap:round; stroke-linejoin:round; }
+/* đếm ngược kiên nhẫn: vòng ĐẦY rồi vơi dần, màu cảnh báo — khác hẳn vòng vàng vẽ dần của
+   nấu/ăn (thứ đang được làm cho mình). Hết vòng là khách bỏ đi (16- Rule 7). */
+.cus-bub.patience { border-color:var(--invalid); }
+.cus-bub.patience .arc { stroke:var(--invalid); }
+.cus-bub.carry { border-color:var(--staff); }
+/* 16- Rule 7: vòng tiến trình quanh bong bóng — SVG + 1 animation WAAPI (ui/restaurant.md TP(2).3),
+   KHÔNG cập nhật style mỗi tick nữa vì như thế chỉ được ~8 fps.
+   TP(3).3: KHÔNG xoay. `rotate(-90deg)` còn sót từ thời conic-gradient làm cái khung chữ nhật
+   nằm ngang hẳn ra ngoài bong bóng. viewBox dựng theo đúng tỉ lệ bong bóng ở restaurant.ts. */
+.cus-bub .ring { position:absolute; left:-3px; top:-3px; width:calc(100% + 6px); height:calc(100% + 6px);
+  overflow:visible; pointer-events:none; }
+.cus-bub .arc { fill:none; stroke:var(--gold); stroke-width:3; stroke-linecap:round; }
 .cus-bub.done { border-color:var(--gold); }
 .cus-bub.bad { border-color:var(--invalid); filter:saturate(.6) brightness(.8); }
-
-/* ---------- hai dòng nhắc dưới HUD ---------- */
-.rh-away { font-size:12px; font-weight:800; color:var(--gold); }
-.rh-hint { font-size:11px; line-height:1.3; color:var(--text-dim); }

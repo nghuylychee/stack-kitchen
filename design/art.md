@@ -760,15 +760,39 @@ dẫn ở mục 3 là card tự đổi sang ảnh, không cần sửa code.
 Theo đúng nếp `public/art/Card/` và `Food/` đang có (PascalCase, không dấu, không
 khoảng trắng):
 
+> **Sửa 2026-09-20 (6) — backlog #43.** Ba thư mục `Facility/`, `Decor/`, `Customer/` và quy ước
+> "tên file = PascalCase của id, luôn `.jpg`" đã **thay bằng hai thư mục theo *chủ thể*** và
+> **tên file ghi nguyên đuôi thật**. Lý do: ảnh người duyệt gom về có đủ `.jpg/.jpeg/.png/.avif`
+> (ảnh cắt nền cần alpha thì phải là `.png`), nên đuôi cố định trong code là sai; và chia
+> facility/decor thành hai thư mục là chia theo *luật game*, trong khi người tìm ảnh nghĩ theo
+> *đồ vật / con người*.
+
 ```text
-public/art/Facility/<PascalCaseId>.jpg     TableBasic.jpg · KitchenBasic.jpg · KitchenExtra.jpg
-public/art/Decor/<PascalCaseId>.jpg        PlantPot.jpg
-public/art/Customer/<PascalCaseId>.jpg     (đợt 2)
+public/art/Props/<Tên>.<đuôi>    Table.jpg · Kitchen.jpg · Tree.jpg        — facility + decor
+public/art/NPC/<Tên>.<đuôi>      Waiter.png · Student.avif · Grab.jpg …   — nhân viên + khách
 ```
 
-`id` trong catalogue (`15-` Rule 2) là `snake_case`; tên file là bản PascalCase của
-chính nó (`table_basic` → `TableBasic.jpg`). Đường dẫn đi qua `ART`
-(`import.meta.env.BASE_URL`) như mọi ảnh khác để build dưới `/<repo>/` không gãy.
+Tên file là **khoá thật**, khai ở đúng một chỗ cho mỗi loại card:
+
+| Card | Khai ở | Trường |
+|---|---|---|
+| đồ đạc | `src/meta/items.ts` | `art: 'Table.jpg'` |
+| khách | `src/core/config.ts` `CUS_TYPES` | `art: 'Student.avif'` |
+| nhân viên | `src/core/config.ts` | `STAFF_ART` |
+
+Thêm một loại khách mới = **thả ảnh vào `public/art/NPC/` + thêm một dòng vào `CUS_TYPES`**,
+không sửa code chỗ nào khác. Đường dẫn vẫn đi qua `ART` (`import.meta.env.BASE_URL`) như mọi ảnh
+khác để build dưới `/<repo>/` không gãy. Tên file vẫn PascalCase, không dấu, không khoảng trắng.
+
+**Ảnh cắt nền, không phải ảnh full-bleed.** Khác thẻ nguyên liệu (`Card/`) và thẻ món (`Food/`) —
+vốn là ảnh chụp lấp đầy khung — ảnh props/NPC là **hình cắt nền đứng một mình**. Nên ô `.ph` của
+card quán dùng `object-fit:contain` trên nền **trắng phẳng**, không `cover`: `cover` xén mất đầu
+và chân người. Ảnh nền trắng (`.jpg`) và ảnh trong suốt (`.png`) vì thế nằm trên cùng một mặt.
+
+**Ảnh nguồn không được mang hoa văn ô cờ.** Ảnh tải từ ngân hàng ảnh hay bị *nướng* luôn hoa văn
+caro "trong suốt" (`#EEE`/`#FFF`) thành pixel. Trong game nó hiện ra thành ô caro xám thật trên
+mặt card. Ba file đã bị và đã làm phẳng về trắng ở #43: `Props/Kitchen.jpg`, `NPC/HangRong.jpg`,
+`NPC/Tourist.jpg` (file gốc `.avif`). Ảnh mới thả vào phải kiểm mắt thường ở góc trước.
 
 ### 4. Lưới và nền quán
 
@@ -791,6 +815,38 @@ Số liệu nhịp nhảy (thời gian mỗi bước, độ cao nhún, độ ngh
 `16-customers-idle.md` + `design/ui/restaurant.md` ở đợt 2 — mục này chỉ chốt **ref và
 tính chất**: rời rạc theo ô, có trọng lượng, hơi ngộ nghĩnh, không "bay".
 
+### 5b. Dàn NPC — ảnh thật, 2026-09-20 (6) (backlog #43)
+
+Bảy loại khách + một nhân viên, mỗi loại một ảnh trong `public/art/NPC/`. Dàn này chọn theo
+**vỉa hè Việt Nam**: ai thật sự ngồi xuống một cái bàn nhựa đỏ. Đó là chỗ `fantasy` của `16-` neo
+vào — người chơi nhận ra cái quán của mình trước khi đọc chữ nào.
+
+| Card | File | Đọc ra ngay |
+|---|---|---|
+| Student | `Student.avif` | đồng phục, cặp sách |
+| Street Vendor | `HangRong.jpg` | nón lá, đôi quang gánh |
+| Delivery Rider | `Grab.jpg` | áo xanh, thùng hàng, xe máy |
+| Tourist | `Tourist.jpg` | ba lô, mũ cói, điện thoại giơ lên |
+| Police Officer | `CongAn.jpg` | quân phục xanh lá, mũ kê pi |
+| Businessman | `Businessman.jpeg` | vest xanh than, cà vạt đỏ |
+| Gangster | `Gangster.png` | kính đen, gậy |
+| Waiter (nhân viên) | `Waiter.png` | tạp dề đỏ, mũ bồi bàn |
+
+**Card NPC là card vuông 2×2 ô** (`13-` Numbers, sửa cùng đợt), không phải card dọc 1×2 như decor:
+người **to hơn đồ đạc** trên lưới, và khung vuông chứa vừa một hình người đứng cả thân mà không
+phải thu nhỏ đến mức không nhận ra ai với ai. Khung vẫn là `.card` thật, vẫn chỉ khác màu viền
+(`--cus` cho khách, `--staff` cho nhân viên) — không đẻ khung mới.
+
+**Nợ kỹ thuật đã biết, chưa chặn:**
+
+1. **Phong cách chưa đồng bộ.** `Tourist.jpg` là ảnh chụp thật, `Student.avif` là nét đen trắng
+   kiểu sách tô màu, còn lại là vector phẳng. Đứng cạnh nhau trên lưới thì thấy rõ. Cần một vòng
+   `/art-spec` thay hai file lệch nhất (Student trước) bằng vector phẳng cùng họ.
+2. **`kitchen_extra` (Second Burner) đang dùng chung `Kitchen.jpg`** — hai card giống hệt nhau,
+   chỉ khác dải tên. Cần một ảnh bếp thứ hai (bếp gas / bếp đôi) để phân biệt.
+3. Câu hỏi §6.1 (ba hex `--fac`/`--dec`/`--cus` chỉnh theo ảnh thật) **giờ mới chạy được** — đã có
+   ảnh thật để đặt cạnh.
+
 ### 6. Câu hỏi mở cho người duyệt
 
 1. Ba hex ở mục 1 là **đề xuất của artist trên bàn giấy**, chưa đặt cạnh ảnh thật. Khi
@@ -798,3 +854,134 @@ tính chất**: rời rạc theo ô, có trọng lượng, hơi ngộ nghĩnh, k
    hoà cho khớp với ảnh. *(Người duyệt đã đồng ý cách làm này, 2026-09-20.)*
 2. ~~Card facility có nên hiện footprint ở góc card trong shop không?~~ **Đã chốt
    2026-09-20: có** — chữ nhỏ `--text-dim` dạng "2×2", để biết món ăn mấy ô trước khi mua.
+
+## HUD quán — ref Hay Day (2026-09-20, backlog #35) — **SUPERSEDED**
+
+> Người duyệt xem bản dựng rồi bác: "UI làm dạng Hayday ko hợp". Hướng đang chạy là
+> **"HUD là một card"** ở mục dưới. Giữ mục này làm hồ sơ; token `--hud-*` đã bỏ khỏi code,
+> chỉ `--xp` / `--xp-lt` còn sống.
+
+Người duyệt sau khi chơi thử đợt 2: HUD tên/level/gold "nhìn nó cứ lạc quẻ so với phần còn lại
+của game", ref **Hay Day**. Mục này chốt hình khối + token; bố cục ở
+`design/ui/restaurant.md` Tuning pass (2) mục 4.
+
+### 1. Cái gì làm nên "Hay Day"
+
+Bốn đặc điểm, đủ để bắt đúng cảm giác mà không cần vẽ lại cả game:
+
+1. **Viền ngoài dày và tối** (3px, nâu gỗ) quanh mọi tấm — không có cạnh mảnh 1px nào.
+2. **Bo góc lớn** (≈ 40% chiều cao tấm) — mọi thứ đều mũm mĩm, không có góc vuông.
+3. **Ba tầng sáng**: bóng đổ bên dưới → nền tấm → một vệt sáng mỏng ở **mép trên trong** (giả khối).
+4. **Huy hiệu tròn đè lên mép tấm** (đĩa level, đồng xu) — thứ tạo nhịp và khiến HUD không phẳng.
+
+Không lấy: màu bão hoà cao và hoạ tiết gỗ vẽ tay của Hay Day. Quán này là quán đêm vỉa hè, nền
+tối — giữ nền tối, chỉ mượn **hình khối**.
+
+### 2. Token mới
+
+| Token | Hex | Dùng cho |
+|---|---|---|
+| `--hud-plate` | `#f4efe2` | mặt tấm biển — **đúng** `--ing-bg` của thẻ bài, để HUD và card là một họ |
+| `--hud-rim` | `#4a3520` | viền ngoài dày, nâu gỗ tối |
+| `--hud-rim-lt` | `#7a5a34` | vệt sáng mép trên trong |
+| `--hud-ink` | `#3b2c1a` | chữ trên nền kem (tên, số level) |
+| `--xp` | `#6cc24a` | ruột thanh XP |
+| `--xp-lt` | `#9be07c` | vệt bóng nửa trên thanh XP |
+
+`--gold` giữ nguyên và **chỉ** dùng cho tiền + vành đĩa level. Thanh XP đổi sang xanh lá vì vàng
+cạnh vàng làm XP và gold trông như một thứ (`ui/restaurant.md` Tuning pass (2)).
+
+### 3. Ba mảnh
+
+- **Tấm biển:** nền `--hud-plate`, viền 3px `--hud-rim`, bo 18px, bóng `0 6px 0 rgba(0,0,0,.35)`
+  (bóng **đặc, không mờ** — đúng kiểu game casual), vệt sáng `inset 0 2px 0 rgba(255,255,255,.55)`.
+- **Đĩa level:** tròn, đường kính ≈ 1.15× cao tấm, nền `--hud-rim`, vành 3px `--gold`, số ở giữa
+  màu `--hud-plate`, đè lên mép trái tấm biển khoảng 40% đường kính.
+- **Đồng xu:** tròn, `radial-gradient` từ `#ffe9a8` sang `--gold`, vành 2px `#b8902f`, một chấm
+  sáng nhỏ lệch trên-trái. Đè lên mép trái capsule gold.
+
+### 4. Khi có ảnh thật
+
+Mục này cố tình dựng bằng **CSS thuần** (gradient + border + shadow), không cần một file ảnh nào —
+HUD phải đứng được trước khi có art. Khi người duyệt có ảnh khung gỗ thật thì thay nền tấm biển
+bằng `border-image`, các token ở mục 2 giữ nguyên tên.
+
+
+## HUD là một card + nhân viên (2026-09-20, backlog #36–#37)
+
+Người duyệt, sau khi xem bản Hay Day: *"dùng concept card để làm UI cho user name, gold và exp
+luôn … để toàn bộ concept game chúng ta xoay quanh card như thế cho đồng bộ."*
+
+### 1. Nguyên tắc: card là ngôn ngữ hình ảnh duy nhất của game
+
+Từ mục này trở đi, **mọi thứ người chơi nhìn thấy trên màn quán đều là một lá bài**: đồ đạc, khách,
+nhân viên, card điều hướng — và cả HUD. Không dựng thêm một loại khung nào nữa (tấm biển, capsule,
+panel bo tròn…). Muốn thêm một thứ lên màn quán thì câu hỏi đầu tiên là *"nó là card gì"*.
+
+Hệ quả: HUD **không có hình khối riêng**. Nó mượn đúng bốn bộ phận đã có của `.card`
+(`ui/table.md`): dải tên `.hdr`, ô ảnh `.ph`, chip tròn `.cchip`, viên điểm `.pchip`. Cái mới duy
+nhất là thanh XP nằm trong `.ph`.
+
+| Bộ phận | Trên thẻ bài | Trên card chef |
+|---|---|---|
+| `.hdr` | tên nguyên liệu / món | **tên người chơi** (ô nhập, sửa tại chỗ) |
+| `.cchip` | khoá món A / M / D | **level**, nền `--xp` |
+| `.ph` | ảnh nguyên liệu | **chân dung bếp trưởng** |
+| `.pchip` | điểm của món | **gold**, nền `--gold` như cũ |
+
+> **Sửa 2026-09-20 (`ui/restaurant.md` Tuning pass (6)):** bảng trên đổi hai dòng. `.hdr` giờ là
+> **thanh XP** (chip level đè lên mép trái nó), tên người chơi xuống **băng đáy `.ftr`** — đúng cách
+> card món `.fcard` đã để tên ở đáy từ bàn chơi, nên không đẻ thêm bộ phận mới. `.pchip` gold rời
+> card chef sang **card `SHOP`**: tiền nằm trên cái cửa dẫn tới chỗ tiêu nó. Cả cụm chuyển xuống
+> **góc trái dưới**, cạnh một nút toggle bật/tắt dải card điều hướng.
+
+### 2. Token
+
+| Token | Hex | Dùng cho |
+|---|---|---|
+| `--staff` | `#5b9ad6` | viền card nhân viên — xanh dương "áo đồng phục", tách hẳn khỏi `--cus` hồng và `--fac` teal |
+| `--xp` | `#6cc24a` | ruột thanh XP **và** nền chip level — cùng một khái niệm (XP đầy → level nhích), nên cùng một màu |
+| `--xp-lt` | `#9be07c` | vệt bóng nửa trên thanh XP |
+
+Bỏ: `--hud-plate`, `--hud-rim`, `--hud-rim-lt`, `--hud-ink`. Card chef dùng thẳng `--ing-bg` /
+`--ing-border` / `--text` của thẻ bài — nó **là** một thẻ bài.
+
+Hue đã đối chiếu: `--staff` 208° không đụng `--fac` 180°, `--cus` 0°, `--course-*`, `--gold` 45°.
+`--new-ring` 195° chỉ chớp trên thẻ vừa bốc ở bàn chơi, không cùng màn.
+
+### 3. Chân dung
+
+| Card | Đường dẫn | Placeholder khi chưa có ảnh |
+|---|---|---|
+| chef | `public/art/Chef/Chef.jpg` | chữ cái đầu của tên người chơi (chưa đặt tên → `?`) |
+| nhân viên | `public/art/Staff/Waiter.jpg` | chữ `W` |
+
+Cùng quy ước với `Customer/` ở mục "Restaurant meta" §2–3: thiếu ảnh thì card vẫn dựng đúng kích
+thước, chữ cái in hoa `--text-dim` cỡ ~34% bề rộng card, không hiện icon ảnh hỏng. Thả ảnh vào
+đúng đường dẫn là card tự đổi, không sửa code.
+
+### 4. Bong bóng và vòng tiến trình
+
+Bong bóng món (`.cus-bub`) dùng chung cho khách và nhân viên. Vòng tiến trình là một `<rect>` bo
+góc **ôm sát viền bong bóng**, nét `--gold` 3px không đổi độ dày khi card to nhỏ
+(`vector-effect:non-scaling-stroke`). Bong bóng là hình chữ nhật đứng, nên khung SVG phải đúng tỉ
+lệ đó — khung vuông kéo giãn làm méo góc bo, và mọi phép xoay đều sai (backlog #38).
+
+
+## Icon trạng thái (2026-09-20, backlog #41)
+
+Ba icon cho ba giai đoạn không có đĩa thức ăn thật trên bàn (`ui/restaurant.md` Tuning pass (5)).
+Dựng bằng **nét SVG inline** trong `restaurant.ts`, `viewBox="0 0 24 24"`, `fill:none`,
+`stroke:var(--dark)`, `stroke-width:1.8`, bo đầu nét tròn — **không thêm file ảnh nào**.
+
+| Icon | Nghĩa | Hình |
+|---|---|---|
+| đồng hồ cát | khách đang chờ có người tới nhận order | hai hình thang chụm đầu, có nắp trên và đáy dưới |
+| dao dĩa | order đã có người nhận, khách chờ món ra | dĩa hai răng bên trái, dao bên phải |
+| phiếu order | nhân viên đang cầm order chạy về bếp | tờ giấy đứng, mép dưới răng cưa, hai dòng kẻ |
+
+Ruột bong bóng là ô vuông cạnh `0.52 × cell`, nền `--ing-bg` (mặt card), bo 8px — icon phải trông
+như **một vật nhỏ đặt trên mặt card**, cùng họ với card món, không phải một nhãn HUD trôi nổi.
+
+**Khi có ảnh thật:** thay `<svg>` bằng `<img>` trỏ vào `public/art/Icon/<Tên>.png`, giữ nguyên ô
+vuông và nền. Ba icon này cố tình đủ đơn giản để không cần thay.

@@ -16,11 +16,11 @@ export const HAND_SIZE = 7;
 
 /** Số món trong Menu công khai của mỗi ván, rút ngẫu nhiên từ 20 món gốc.
  *  Phải ≤ 20 và ≥ ORDER_SIZE cùng số người. Range 5–12 · design/07-menu-orders.md */
-export const MENU_SIZE: Record<number, number> = { 2: 6, 3: 8, 4: 10 };
+export const MENU_SIZE: Record<number, number> = { 2: 4, 3: 6, 4: 8 };
 
 /** Số món trong Order bí mật của mỗi người (mục tiêu phải nấu xong để kết thúc ván).
  *  Phải ≤ MENU_SIZE cùng số người. Range 2–6 · design/07-menu-orders.md */
-export const ORDER_SIZE: Record<number, number> = { 2: 3, 3: 4, 4: 5 };
+export const ORDER_SIZE: Record<number, number> = { 2: 2, 3: 3, 4: 4 };
 
 // ---- Bộ bài --------------------------------------------------------------------------
 
@@ -32,7 +32,7 @@ export const COPIES_PER_TYPE_MENU = 6;
 
 /** Điểm món theo số thẻ trong công thức: món 2 thẻ / 3 thẻ / 4 thẻ.
  *  Phải có đủ cả 3 cỡ 2, 3, 4 (20 món gốc dùng đủ 3 cỡ). design/04-food-score-end.md */
-export const POINTS_BY_SIZE: Record<number, number> = { 2: 2, 3: 4, 4: 7 };
+export const POINTS_BY_SIZE: Record<number, number> = { 2: 2, 3: 3, 4: 5 };
 
 /** Điểm thưởng cho người đầu tiên nấu xong hết Order (ván dừng ngay).
  *  Range 5–20 · design/07-menu-orders.md */
@@ -55,14 +55,22 @@ export const TURN_LIMIT_MS = 30000;
 export const START_LEVEL = 1;
 export const START_GOLD = 0;
 
-/** Lưới đặt đồ trong quán: số cột, số hàng, và cạnh nhỏ nhất / lớn nhất của một ô (px).
- *  Ô không nhỏ hơn CELL_MIN_PX (sàn tap target — màn hẹp thì lưới cuộn) và không lớn hơn
- *  CELL_MAX_PX (chặn card phình to trên màn rộng). Ít cột/hàng hơn = ô to hơn = card to hơn.
- *  Range cột 12–28 · hàng 8–18 · ô 44–96 · design/13-restaurant-grid.md */
-export const GRID_COLS = 22;
-export const GRID_ROWS = 14;
-export const CELL_MIN_PX = 44;
-export const CELL_MAX_PX = 64;
+/** Mặt bằng quán: số cột × số hàng. Rộng hơn màn hình nhiều lần — người chơi kéo/zoom để đi quanh
+ *  (design/13-restaurant-grid.md Rule 14–17). Muốn quán to hơn thì tăng hai số này, không cần sửa code.
+ *  Range cột 22–120 · hàng 14–80 */
+export const GRID_COLS = 100;
+export const GRID_ROWS = 50;
+
+/** Cạnh một ô ở zoom 1 (px). Card facility 2×3 = 112×168, xấp xỉ thẻ bài trên tay. Range 40–80 */
+export const CELL_PX = 56;
+
+/** Giới hạn zoom: ô không bao giờ nhỏ hơn CELL_MIN_PX (sàn tap target) và không phóng quá ZOOM_MAX.
+ *  Thu hết cỡ thì lưới vẫn luôn phủ kín màn, nên không bao giờ nhìn thấy mép lưới.
+ *  ZOOM_WHEEL_STEP là hệ số nhân cho mỗi đơn vị deltaY của con lăn.
+ *  Range 44+ · 1–4 · 0.0005–0.005 */
+export const CELL_MIN_PX = 30;
+export const ZOOM_MAX = 1.8;
+export const ZOOM_WHEEL_STEP = 0.0015;
 
 // ---- Thưởng sau ván: gold, XP, level (design/14-gold-xp-level.md) --------------------
 //  Thưởng KHÔNG ảnh hưởng ván bài — chỉ cộng vào quán (12- Rule 6). Cùng một công thức
@@ -123,8 +131,8 @@ export const START_DISHES = ['Phở Bò', 'Xôi Gấc'];
 
 // ---- Khách trong quán (design/16-customers-idle.md) ---------------------------------
 //  Khách KHÔNG đụng ván bài (12- Rule 6) — chỉ chạy trên màn quán và cộng gold/XP vào save.
-//  Số bàn = số khách cùng lúc; số bếp = số món nấu song song. Mua lệch một bên thì khách chờ
-//  quá CUS_PATIENCE_MS rồi bỏ đi tay không.
+//  Số bàn = số khách cùng lúc; nấu song song được min(số bếp, số nhân viên) món (xem STAFF_START).
+//  Mua lệch một cạnh thì khách chờ quá CUS_PATIENCE_MS rồi bỏ đi tay không.
 
 /** Nhịp nhảy từng ô kiểu Stacklands: thời gian một bước (ms), độ nhấc (× cạnh ô), độ nghiêng (deg).
  *  Range 150–500 · 0.1–0.6 · 0–15 */
@@ -139,7 +147,7 @@ export const CUS_SPAWN_MS = 5000;
 export const CUS_ORDER_MS = 900;
 export const COOK_PER_CARD_MS = 2500;
 export const CUS_EAT_MS = 2600;
-export const CUS_PATIENCE_MS = 22000;
+export const CUS_PATIENCE_MS = 22000;   // 18- Rule 9: chỉ đếm khi CHƯA có nhân viên nhận order
 
 /** Tiền và XP một khách trả: nền + theo điểm của món (điểm lấy từ POINTS_BY_SIZE).
  *  Gold còn nhân thêm `tip` của loại khách. Range nền 0–20 · mỗi điểm 1–8 */
@@ -149,12 +157,43 @@ export const CUS_XP_BASE = 1;
 export const CUS_XP_PER_PT = 1;
 
 /** Các loại khách. `tip` nhân vào gold, `weight` là tỉ lệ xuất hiện (càng lớn càng hay gặp),
- *  `art` là tên file trong public/art/Customer/. Thêm loại mới = thêm một dòng. */
+ *  `art` là TÊN FILE (kèm đuôi) trong public/art/NPC/. Thêm loại mới = thả ảnh vào thư mục đó
+ *  rồi thêm một dòng ở đây, không cần sửa code chỗ nào khác (16- Rule 3).
+ *  `name` là in-game text nên viết tiếng Anh. Range tip 0.5–2.5 · weight 1–10 */
 export const CUS_TYPES = [
-  { id: 'local',   name: 'Local',   tip: 1.0, weight: 5, art: 'Local' },
-  { id: 'student', name: 'Student', tip: 0.7, weight: 3, art: 'Student' },
-  { id: 'tourist', name: 'Tourist', tip: 1.6, weight: 2, art: 'Tourist' },
+  { id: 'student',  name: 'Student',        tip: 0.7, weight: 5, art: 'Student.avif' },
+  { id: 'vendor',   name: 'Street Vendor',  tip: 1.0, weight: 4, art: 'HangRong.jpg' },
+  { id: 'rider',    name: 'Delivery Rider', tip: 0.9, weight: 4, art: 'Grab.jpg' },
+  { id: 'tourist',  name: 'Tourist',        tip: 1.6, weight: 2, art: 'Tourist.jpg' },
+  { id: 'officer',  name: 'Police Officer', tip: 1.2, weight: 2, art: 'CongAn.jpg' },
+  { id: 'boss',     name: 'Businessman',    tip: 2.0, weight: 2, art: 'Businessman.jpeg' },
+  { id: 'gangster', name: 'Gangster',       tip: 0.4, weight: 1, art: 'Gangster.png' },
 ];
+
+// ---- Nhân viên (design/18-staff.md) -------------------------------------------------
+//  Nhân viên nhận order tận bàn, chạy về BẾP đứng nấu rồi bưng ra. Nấu song song được
+//  min(số nhân viên, số bếp) món — mua thêm bếp mà không có người thì bếp đứng không.
+
+/** Số nhân viên của quán MỚI. Về sau người chơi thuê thêm trong shop, số thật nằm ở `save.staff`
+ *  (18- Rule 1). Range 0–4 · 0 = không ai phục vụ, khách gọi món rồi bỏ đi hết */
+export const STAFF_START = 1;
+
+/** Ảnh nhân viên — tên file (kèm đuôi) trong public/art/NPC/, như `art` của CUS_TYPES. */
+export const STAFF_ART = 'Waiter.png';
+
+/** Giá thuê NGƯỜI TIẾP THEO và level tối thiểu để thuê: phần tử [0] là người thứ 2, [1] là người
+ *  thứ 3… Hai bảng phải dài bằng nhau; độ dài bảng quyết định luôn trần số nhân viên.
+ *  Range giá 100–3000 · level 1–15 (18- Rule 14) */
+export const STAFF_PRICE = [250, 700, 1500];
+export const STAFF_MIN_LEVEL = [2, 5, 8];
+
+/** Trần số nhân viên — suy ra từ bảng giá để hai chỗ không bao giờ lệch nhau. KHÔNG sửa tay. */
+export const STAFF_MAX = STAFF_START + STAFF_PRICE.length;
+
+/** Nhịp nhảy của nhân viên (ms) — nhanh hơn khách (HOP_MS) để đọc ra "đang chạy",
+ *  và nhịp đứng lại lúc nhận order / lúc trả món. Range 120–400 · 200–1200 */
+export const STAFF_HOP_MS = 190;
+export const STAFF_PICK_MS = 420;
 
 /** Thu nhập lúc KHÔNG mở màn quán (đang chơi ván, đóng tab…): cứ IDLE_CYCLE_MS được một lượt
  *  khách mỗi bàn, ăn IDLE_RATE phần tiền, cộng dồn tối đa IDLE_CAP_H giờ.

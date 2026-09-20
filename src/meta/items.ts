@@ -5,12 +5,14 @@
 export type ItemKind = 'facility' | 'decor';
 export interface ItemDef { name: string; kind: ItemKind; w: number; h: number; art: string }
 
-// art = tên file PascalCase dưới public/art/<Facility|Decor>/ (design/art.md "Restaurant meta" §3).
+// art = TÊN FILE (kèm đuôi) dưới public/art/Props/ (design/art.md "Restaurant meta" §3, sửa
+// 2026-09-20 (6): một thư mục chung cho facility lẫn decor, và tên file giữ nguyên đuôi thật
+// vì ảnh người duyệt thả vào có đủ .jpg/.jpeg/.png). Chuỗi rỗng = chưa có ảnh → placeholder chữ cái.
 export const ITEMS: Record<string, ItemDef> = {
-  table_basic:    { name: 'Street Table',   kind: 'facility', w: 2, h: 3, art: 'TableBasic' },
-  kitchen_basic:  { name: 'Kitchen',        kind: 'facility', w: 2, h: 3, art: 'KitchenBasic' },
-  kitchen_extra:  { name: 'Second Burner',  kind: 'facility', w: 2, h: 3, art: 'KitchenExtra' },
-  plant_pot:      { name: 'Potted Plant',   kind: 'decor',    w: 1, h: 2, art: 'PlantPot' },
+  table_basic:    { name: 'Street Table',   kind: 'facility', w: 2, h: 3, art: 'Table.jpg' },
+  kitchen_basic:  { name: 'Kitchen',        kind: 'facility', w: 2, h: 3, art: 'Kitchen.jpg' },
+  kitchen_extra:  { name: 'Second Burner',  kind: 'facility', w: 2, h: 3, art: 'Kitchen.jpg' },
+  plant_pot:      { name: 'Potted Plant',   kind: 'decor',    w: 1, h: 2, art: 'Tree.jpg' },
 };
 
 export const itemDef = (type: string): ItemDef =>
