@@ -478,6 +478,11 @@ hình ở `design/art.md` "Icon trạng thái".
 Viền bong bóng: đỏ `--invalid` cho kiên nhẫn, xanh `--staff` cho phiếu order (cùng màu viền card
 nhân viên — "cái này thuộc về nhân viên"), mặc định cho dao dĩa.
 
+> **Sửa 2026-09-20 (backlog #43):** bỏ **đuôi nhọn** dưới bong bóng. Người duyệt: *"Bỏ mũi tên màu
+> đen ở bên dưới cái bubble trên đầu các NPC đi."* Nó là mẩu hình duy nhất trên màn quán không phải
+> card (art.md "card là ngôn ngữ hình ảnh duy nhất"), và cái chấm đen ấy đè xuống đúng mép trên card
+> NPC. Bong bóng treo ngay trên đầu ai thì đã đủ rõ là của ai — không cần mũi chỉ.
+
 ### Thêm vào Done when
 
 - Khách ngồi xuống gọi món xong: hiện đồng hồ cát, vòng đỏ **đầy rồi vơi dần**; vơi hết đúng lúc

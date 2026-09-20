@@ -191,8 +191,8 @@
 .cus .bub { position:absolute; left:50%; bottom:calc(100% + 6px); transform:translateX(-50%); }
 .cus-bub { position:relative; padding:3px; border-radius:12px; background:rgba(13,11,9,.82);
   border:1px solid var(--panel-border); box-shadow:0 6px 14px rgba(0,0,0,.5); }
-.cus-bub::after { content:''; position:absolute; left:50%; top:100%; margin-left:-5px;
-  border:5px solid transparent; border-top-color:rgba(13,11,9,.82); }
+/* TP(6): KHÔNG có đuôi nhọn dưới bong bóng. Nó là mẩu hình duy nhất trên màn không phải card,
+   và cái chấm đen ấy đè lên đầu card NPC. Bong bóng nằm ngay trên đầu ai thì đã đủ rõ là của ai. */
 /* TP(5): ba trạng thái icon — ruột bong bóng là một ô vuông mặt kem như mặt card, icon vẽ bằng
    nét SVG nên không cần file ảnh nào (art.md "Icon trạng thái"). */
 .cus-bub .icn { width:var(--d); height:var(--d); border-radius:8px; background:var(--ing-bg);
